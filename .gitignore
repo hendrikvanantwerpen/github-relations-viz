@@ -4,3 +4,5 @@ target/
 /.cache
 .*.swp
 /project/target/
+/.project
+/.classpath
