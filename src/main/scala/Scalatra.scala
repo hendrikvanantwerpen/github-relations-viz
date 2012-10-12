@@ -1,6 +1,8 @@
 import nl.tudelft.courses.in4355.github_relations_viz._
+import akka.actor.ActorSystem
 import org.scalatra._
 import javax.servlet.ServletContext
+import com.typesafe.config.ConfigFactory
 
 /**
  * This is the Scalatra bootstrap file. You can use it to mount servlets or
@@ -9,8 +11,9 @@ import javax.servlet.ServletContext
  */
 class Scalatra extends LifeCycle {
   override def init(context: ServletContext) {
-
-    // Mount one or more servlets
-    context.mount(new GHRelationsVizServlet, "/*")
+    val config = ConfigFactory.load()
+    val app = ActorSystem("GithubRelationsViz", config.getConfig("myapp1").withFallback(config))
+    val rest = new GHRelationsVizServlet
+    context.mount(rest, "/*")
   }
 }

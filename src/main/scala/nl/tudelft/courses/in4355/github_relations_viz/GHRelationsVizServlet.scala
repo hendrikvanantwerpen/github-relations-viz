@@ -1,9 +1,12 @@
 package nl.tudelft.courses.in4355.github_relations_viz
 
+import akka.dispatch.Future
+import akka.actor.ActorSystem
 import org.scalatra._
+import org.scalatra.akka.AkkaSupport
 import scalate.ScalateSupport
 
-class GHRelationsVizServlet extends ScalatraServlet with ScalateSupport {
+class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport with ScalateSupport {
 
   get("/") {
     <html>
@@ -12,6 +15,12 @@ class GHRelationsVizServlet extends ScalatraServlet with ScalateSupport {
         Say <a href="hello-scalate">hello to Scalate</a>.
       </body>
     </html>
+  }
+  
+  get("/someUrl") {
+    Future {
+      
+    }
   }
 
   notFound {
@@ -22,5 +31,9 @@ class GHRelationsVizServlet extends ScalatraServlet with ScalateSupport {
       contentType = "text/html"
       layoutTemplate(path)
     } orElse serveStaticResource() getOrElse resourceNotFound()
+  }
+  
+  override def system: ActorSystem = {
+    
   }
 }

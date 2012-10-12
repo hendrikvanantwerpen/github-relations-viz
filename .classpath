@@ -5,10 +5,13 @@
   <classpathentry output="target/scala-2.9.1/test-classes" path="src/test/java" kind="src"></classpathentry>
   <classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.scalaquery/scalaquery_2.9.1/jars/scalaquery_2.9.1-0.10.0-M1.jar" kind="lib"></classpathentry>
+  <classpathentry path="/home/hendrik/.ivy2/cache/com.typesafe.akka/akka-actor/jars/akka-actor-2.0.3.jar" kind="lib"></classpathentry>
+  <classpathentry path="/home/hendrik/.ivy2/cache/com.typesafe/config/bundles/config-0.3.1.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.scalatra/scalatra/jars/scalatra-2.1.1.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.clapper/grizzled-slf4j_2.9.2/jars/grizzled-slf4j_2.9.2-0.6.9.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.slf4j/slf4j-api/jars/slf4j-api-1.6.4.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/io.backchat.rl/rl_2.9.2/jars/rl_2.9.2-0.3.2.jar" kind="lib"></classpathentry>
+  <classpathentry path="/home/hendrik/.ivy2/cache/org.scalatra/scalatra-akka/jars/scalatra-akka-2.1.1.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.scalatra/scalatra-scalate/jars/scalatra-scalate-2.1.1.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.fusesource.scalate/scalate-core/bundles/scalate-core-1.5.3.jar" kind="lib"></classpathentry>
   <classpathentry path="/home/hendrik/.ivy2/cache/org.fusesource.scalate/scalate-util/bundles/scalate-util-1.5.3.jar" kind="lib"></classpathentry>
