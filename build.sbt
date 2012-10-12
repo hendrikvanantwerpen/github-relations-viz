@@ -13,10 +13,7 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.scalaquery" %% "scalaquery" % "0.10.0-M1",
-  "com.typesafe.akka" % "akka-actor" % "2.0.3",
   "org.scalatra" % "scalatra" % "2.1.1",
-  "org.scalatra" % "scalatra-akka" % "2.1.1",
   "org.scalatra" % "scalatra-scalate" % "2.1.1",
   "org.scalatra" % "scalatra-specs2" % "2.1.1" % "test",
   "ch.qos.logback" % "logback-classic" % "1.0.6" % "runtime",

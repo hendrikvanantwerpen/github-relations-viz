@@ -1,12 +1,9 @@
 package nl.tudelft.courses.in4355.github_relations_viz
 
-import akka.dispatch.Future
-import akka.actor.ActorSystem
 import org.scalatra._
-import org.scalatra.akka.AkkaSupport
 import scalate.ScalateSupport
 
-class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport with ScalateSupport {
+class GHRelationsVizServlet extends ScalatraServlet with ScalateSupport {
 
   get("/") {
     <html>
@@ -17,12 +14,6 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport with Scalat
     </html>
   }
   
-  get("/someUrl") {
-    Future {
-      
-    }
-  }
-
   notFound {
     // remove content type in case it was set through an action
     contentType = null
@@ -33,7 +24,4 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport with Scalat
     } orElse serveStaticResource() getOrElse resourceNotFound()
   }
   
-  override def system: ActorSystem = {
-    
-  }
 }
