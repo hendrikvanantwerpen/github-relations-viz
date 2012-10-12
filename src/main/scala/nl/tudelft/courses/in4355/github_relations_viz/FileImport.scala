@@ -29,7 +29,7 @@ object HelloWorld {
 
 	
 	def groupOperator(commit: Commit, state: projectsPerUser): projectsPerUser = {
-	  
+	  asdsaa
 	}
 	
 	/**
