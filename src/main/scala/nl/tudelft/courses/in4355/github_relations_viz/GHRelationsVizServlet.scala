@@ -2,26 +2,22 @@ package nl.tudelft.courses.in4355.github_relations_viz
 
 import org.scalatra._
 import scalate.ScalateSupport
+import net.liftweb.json._
+import net.liftweb.json.JsonDSL._
+import net.liftweb.json.Serialization.write
 
-class GHRelationsVizServlet extends ScalatraServlet with ScalateSupport {
+import FileImport._
 
-  get("/") {
-    <html>
-      <body>
-        <h1>Hello, world!</h1>
-        Say <a href="hello-scalate">hello to Scalate</a>.
-      </body>
-    </html>
-  }
+case class SomeResponse
+
+class GHRelationsVizServlet extends ScalatraServlet {
   
-  notFound {
-    // remove content type in case it was set through an action
-    contentType = null
-    // Try to render a ScalateTemplate if no route matched
-    findTemplate(requestPath) map { path =>
-      contentType = "text/html"
-      layoutTemplate(path)
-    } orElse serveStaticResource() getOrElse resourceNotFound()
+  get("/data") {
+    val from = params get "from" map( _.toInt ) getOrElse( Int.MinValue )
+    val to = params get "to" map( _.toInt ) getOrElse( Int.MaxValue )
+    contentType = "application/json;charset=UTF-8"
+    implicit val formats = Serialization.formats(NoTypeHints)
+    write(getProjectRelations(from,to))
   }
-  
+    
 }
