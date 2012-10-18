@@ -1,6 +1,12 @@
-
 $(document).ready(function(){
   var labelType, useGradients, nativeTextSupport, animate;
+
+  var minDate = 1000077749
+  var maxDate = 2145924722
+  var avgDate = Math.round( (minDate + maxDate) / 2 )
+  var dayRange = 604800
+  var startMin = avgDate - dayRange
+  var startMax = avgDate + dayRange
 
   var ua = navigator.userAgent,
       iStuff = ua.match(/iPhone/i) || ua.match(/iPad/i),
@@ -85,7 +91,7 @@ $(document).ready(function(){
       }
     },
     //Number of iterations for the FD algorithm
-    iterations: 200,
+    iterations: 10,
     //Edge length
     levelDistance: 130,
     // Add text to the labels. This method is only triggered
@@ -111,9 +117,9 @@ $(document).ready(function(){
 
   $( "#date-range-slider" ).slider({
     range: true,
-    min: 0,
-    max: 100,
-    values: [ 0, 100 ],
+    min: minDate,
+    max: maxDate,
+    values: [ startMin, startMax ],
     slide: function( event, ui ) {
       updateGraph( ui.values[ 0 ], ui.values[ 1 ] )
     }
@@ -143,6 +149,6 @@ $(document).ready(function(){
     });
   }
 
-  updateGraph(0,100)
+  updateGraph(startMin, startMax)
 
 });

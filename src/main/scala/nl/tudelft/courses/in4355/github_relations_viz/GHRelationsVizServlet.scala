@@ -6,7 +6,7 @@ import net.liftweb.json._
 import net.liftweb.json.JsonDSL._
 import net.liftweb.json.Serialization.write
 
-import FileImport._
+import GHRelationsViz._
 
 case class SomeResponse
 

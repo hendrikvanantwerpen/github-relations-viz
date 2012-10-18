@@ -7,3 +7,5 @@ target/
 /.project
 /.classpath
 /.worksheet
+/src/main/resources/commits.txt
+/src/main/webapp/Jit/
