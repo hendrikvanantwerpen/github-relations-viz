@@ -82,11 +82,21 @@ object GHRelationsViz {
     Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt)
   }
   
-  def groupProjectsPerUser(state: Map[User,Set[Project]], commit: Commit): Map[User,Set[Project]] = {
+/**
+ * 
+ * @param state
+ * @param commit
+ * @return
+ */
+def groupProjectsPerUser(state: Map[User,Set[Project]], commit: Commit): Map[User,Set[Project]] = {
     state |+| Map((commit.user,Set(commit.project)))
   }
 
-  def getAllProjectLinks(ps: Set[Project]) = {
+/**
+ * @param ps
+ * @return
+ */
+def getAllProjectLinks(ps: Set[Project]) = {
     ps
     .subsets(2)
     .map( (ss) => {
@@ -95,11 +105,25 @@ object GHRelationsViz {
       } )
   }
   
-  def createAdjacencyMap(state: Map[Project,List[Project]], link: Link): Map[Project,List[Project]] = {
+/**
+ * 
+ * @param state
+ * @param link
+ * @return
+ */
+def createAdjacencyMap(state: Map[Project,List[Project]], link: Link): Map[Project,List[Project]] = {
     state |+| Map((link.p1,List(link.p2)))
   }
 
-  def zipAndMap[A,B,C](as: Set[A], bs: Map[A,B])(f: (A,Option[B]) => C): List[C] = {
+  
+/**
+ * 
+ * @param as
+ * @param bs
+ * @param f
+ * @return
+ */
+def zipAndMap[A,B,C](as: Set[A], bs: Map[A,B])(f: (A,Option[B]) => C): List[C] = {
     def acc(res: List[C], rest: List[A]): List[C] = rest match {
       case Nil => res
       case h::ts => acc( f(h, bs get h) :: res, ts )
@@ -107,7 +131,13 @@ object GHRelationsViz {
     acc(Nil, as.toList)
   }
   
-  def createGraphNodeFromProjectAndLinks(p: Project, as:Option[List[Project]]) = 
+/**
+ * Convert a project and list of linked projects into a graph node object to be converted into JSON
+ * @param p
+ * @param as
+ * @return
+ */
+def createGraphNodeFromProjectAndLinks(p: Project, as:Option[List[Project]]) = 
       JITGraphNode(p.id.toString, p.name, as map( _ map( _.id.toString )))
 
 }
