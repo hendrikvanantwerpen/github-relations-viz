@@ -126,27 +126,34 @@ $(document).ready(function(){
   });
 
   function updateGraph( from, to ) {
-    $( "#date-range" ).text( from+" - "+to );
-    $.get('/data?from='+from+'&to='+to,function(json){
-      // load JSON data.
-      fd.loadJSON(json);
-      // compute positions incrementally and animate.
-      fd.computeIncremental({
-        iter: 200,
-        property: 'end',
-        onStep: function(perc){
-          console.log(perc + '% loaded...');
-        },
-        onComplete: function(){
-          console.log('done');
-          fd.animate({
-            modes: ['linear'],
-            transition: $jit.Trans.Elastic.easeOut,
-            duration: 2500
-          });
-        }
-      });
-    });
+  	if($("#statusLabel").html() != 'idle') {
+  		request.abort();
+  	}
+	    $( "#date-range" ).text( from+" - "+to );
+	    $("#statusLabel").html('loading...');
+	    request = $.get('/data?from='+from+'&to='+to,function(json){
+	    $("#statusLabel").html('idle');
+	      // load JSON data.
+	      fd.loadJSON(json);
+	      // compute positions incrementally and animate.
+	      fd.computeIncremental({
+	        iter: 200,
+	        property: 'end',
+	        onStep: function(perc){
+	          console.log(perc + '% loaded...');
+	        },
+	        onComplete: function(){
+	        console.log('done');
+	          fd.animate({
+	            modes: ['linear'],
+	            transition: $jit.Trans.Elastic.easeOut,
+	            duration: 2500
+	          });
+	        }
+	      });
+	   
+	   });
+     
   }
 
   updateGraph(startMin, startMax)

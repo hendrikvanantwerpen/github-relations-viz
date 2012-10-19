@@ -51,6 +51,7 @@ class GHRelationsViz(src: Source) {
     t.tick("created project adjecancy map")
     val projectAndOptAdjecancyMap = mapReduce(zipWithOption(projectAdjacencyMap))(involvedProjects.keySet)
     t.tick("zipped projects with optional adjecancy")
+    
     val graphNodes = mapReduce(createGraphNodeFromProjectAndLinks)(projectAndOptAdjecancyMap)
     t.tick("created graph nodes as")
     graphNodes.keySet
@@ -101,6 +102,11 @@ class GHRelationsViz(src: Source) {
     Map(x -> os.get(x))
   
   def createGraphNodeFromProjectAndLinks(pl: (Project,Option[List[Project]])): Map[JITGraphNode,Option[Nothing]] =
-      Map(JITGraphNode(pl._1.id.toString, pl._1.name, pl._2.map( _ map( _.id.toString ))) -> None)
+      Map(
+    		  JITGraphNode(
+    		      pl._1.id.toString, 
+    		      pl._1.name, 
+    		      pl._2.map(_ map( _.id.toString ))) -> None
+    		  )
 
 }
