@@ -44,7 +44,7 @@ class GHRelationsViz(src: Source) {
     t.tick("mapped projects to users")
     val projectLinks = mapReduce(getAllNormalizedProjectLinks)(userProjects.values)    
     t.tick("created all project links")
-    val bigProjectLinks = projectLinks.filter( _._2 > minDegree ).keySet
+    val bigProjectLinks = projectLinks.filter( _._2 >= minDegree ).keySet
     val involvedProjects = mapReduce(getProjectsFromLink)(bigProjectLinks)
     t.tick("iterated all involved projects")
     val projectAdjacencyMap = mapReduce(createAdjacencyMap)(bigProjectLinks)

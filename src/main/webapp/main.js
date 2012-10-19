@@ -5,8 +5,9 @@ $(document).ready(function(){
   var maxDate = 2145924722
   var avgDate = Math.round( (minDate + maxDate) / 2 )
   var dayRange = 604800
-  var startMin = avgDate - dayRange
-  var startMax = avgDate + dayRange
+  minTime = avgDate - dayRange
+  maxTime = avgDate + dayRange
+  degree = 0
 
   var ua = navigator.userAgent,
       iStuff = ua.match(/iPhone/i) || ua.match(/iPad/i),
@@ -50,7 +51,7 @@ $(document).ready(function(){
     //Native canvas text styling
     Label: {
       type: labelType, //Native or HTML
-      size: 10,
+      size: 4,
       style: 'bold'
     },
     //Add Tips
@@ -119,19 +120,39 @@ $(document).ready(function(){
     range: true,
     min: minDate,
     max: maxDate,
-    values: [ startMin, startMax ],
+    values: [ minTime, maxTime ],
     slide: function( event, ui ) {
-      updateGraph( ui.values[ 0 ], ui.values[ 1 ] )
+    	minTime =  ui.values[ 0 ];
+    	maxTime = ui.values[ 1 ];
+      	updateGraph();
+    }
+  });
+  
+    $( "#degree-range-slider" ).slider({
+    range: false,
+    min: 0,
+    max: 20,
+    values: [ degree ],
+    slide: function( event, ui ) {
+    	degree=ui.values[0];
+      	updateGraph();
     }
   });
 
-  function updateGraph( from, to ) {
+  function fmtEpoch(e) {
+  	return new Date(1000*e).toString();
+  }
+  
+  function updateGraph() {
+  	var from = minTime;
+  	var to = maxTime;
   	if($("#statusLabel").html() != 'idle') {
-  		request.abort();
-  	}
-	    $( "#date-range" ).text( from+" - "+to );
+  		//request.abort();
+  	} else {
+	    $( "#date-range" ).text( fmtEpoch(from)+" - "+fmtEpoch(to));
+	    $('#degree').text(degree )
 	    $("#statusLabel").html('loading...');
-	    request = $.get('/data?from='+from+'&to='+to,function(json){
+	    request = $.get('/data?from='+from+'&to='+to+'&degree='+degree,function(json){
 	    $("#statusLabel").html('idle');
 	      // load JSON data.
 	      fd.loadJSON(json);
@@ -153,9 +174,9 @@ $(document).ready(function(){
 	      });
 	   
 	   });
-     
+     }
   }
 
-  updateGraph(startMin, startMax)
+  updateGraph()
 
 });
