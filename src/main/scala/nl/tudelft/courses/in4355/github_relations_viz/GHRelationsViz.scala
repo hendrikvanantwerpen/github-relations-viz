@@ -25,21 +25,29 @@ class Timer {
 
 class GHRelationsViz(src: Source) {
   
+  private val MIN_TIME = 100000000
+  
   private val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r
   
   val commits = readCommitsFromSource(src).take( 100000 ).toList
   
-  def getProjectRelations(from: Int, until: Int) = {
+  def getLimits = Range(
+      (Int.MaxValue /: commits)( (a,c) => Math.min(a,c.timestamp) ),
+      (Int.MinValue /: commits)( (a,c) => Math.max(a,c.timestamp) )
+  )
+  
+  def getProjectRelations(from: Int, until: Int, minDegree: Int) = {
     val t = new Timer
     val commitsInRange = commits.filter( isCommitInRange(_, from, until) )
     t.tick("filtered commits")
     val userProjects = mapReduce(commitToUserProject)(commitsInRange)
     t.tick("mapped projects to users")
-    val projectLinks = mapReduce(getAllNormalizedProjectLinks)(userProjects.values)
+    val projectLinks = mapReduce(getAllNormalizedProjectLinks)(userProjects.values)    
     t.tick("created all project links")
-    val involvedProjects = mapReduce(getProjectsFromLink)(projectLinks)
+    val bigProjectLinks = projectLinks.filter( _._2 > minDegree ).keySet
+    val involvedProjects = mapReduce(getProjectsFromLink)(bigProjectLinks)
     t.tick("iterated all involved projects")
-    val projectAdjacencyMap = mapReduce(createAdjacencyMap)(projectLinks)
+    val projectAdjacencyMap = mapReduce(createAdjacencyMap)(bigProjectLinks)
     t.tick("created project adjecancy map")
     val projectAndOptAdjecancyMap = mapReduce(zipWithOption(projectAdjacencyMap))(involvedProjects.keySet)
     t.tick("zipped projects with optional adjecancy")
@@ -53,6 +61,7 @@ class GHRelationsViz(src: Source) {
     .getLines
     .filter(isNotEmpty)
     .map(parseStringToCommit)
+    .filter( _.timestamp > MIN_TIME )
 
   def isNotEmpty(str: String) = !(str isEmpty)
   
@@ -74,13 +83,15 @@ class GHRelationsViz(src: Source) {
   def getProjectsFromLink(l:Link): Map[Project,Option[Nothing]] =
     Map(l.p1 -> None, l.p2 -> None)
     
-  def getAllNormalizedProjectLinks(ps: Set[Project]): List[Link] =
+  def getAllNormalizedProjectLinks(ps: Set[Project]): Map[Link,Int] =
     ps
     .subsets(2)
     .map( (ss) => {
         val l = ss.toList
         Link(l(0),l(1)).normalize
-    } ) toList
+    } )
+    .map( l => (l,1) )
+    .foldLeft(Map.empty[Link,Int])( (m,t) => m + t )
   
   def createAdjacencyMap(link: Link): Map[Project,List[Project]] = {
     Map((link.p1,List(link.p2)))
