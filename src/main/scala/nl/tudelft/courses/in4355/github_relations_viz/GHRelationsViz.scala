@@ -28,6 +28,14 @@ object GHRelationsViz {
   
   val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r
   
+  implicit object OptionNothingZero extends Zero[Option[Nothing]] {
+    val zero = None
+  }
+
+  implicit object OptionNothingSemigroup extends Semigroup[Option[Nothing]] {
+    def append(s1: Option[Nothing], s2: => Option[Nothing]) = None
+  }  
+  
   def getProjectRelations(from: Int, until: Int) = {
     val t = new Timer
     val src = Source.fromURL(getClass.getResource("/commits.txt"))
@@ -46,10 +54,10 @@ object GHRelationsViz {
     t.tick("iterated all involved projects")
     val projectAdjacencyMap = mapReduce(createAdjacencyMap)(projectLinks)
     t.tick("created project adjecancy map")
-    val projectAndOptAdjecancyMap = mapReduce(zipWithOption(projectAdjacencyMap))(involvedProjects)
+    val projectAndOptAdjecancyMap = mapReduce(zipWithOption(projectAdjacencyMap))(involvedProjects.keySet)
     t.tick("zipped projects with optional adjecancy")
     val graphNodes = mapReduce(createGraphNodeFromProjectAndLinks)(projectAndOptAdjecancyMap)
-    t.tick("created graph nodes")
+    t.tick("created graph nodes as")
     graphNodes
   }
   
@@ -72,9 +80,8 @@ object GHRelationsViz {
   def commitToUserProject(c: Commit): Map[User,Set[Project]] =
     Map(c.user -> Set(c.project))
 
-  def getProjectsFromLink(l: Link): Set[Project] = {
-    Set(l.p1,l.p2)
-  }
+  def getProjectsFromLink(l:Link): Map[Project,Option[Nothing]] =
+    Map(l.p1 -> None, l.p2 -> None)
     
   def getAllNormalizedProjectLinks(ps: Set[Project]): List[Link] =
     ps
@@ -91,7 +98,7 @@ object GHRelationsViz {
   def zipWithOption[A,B](os: Map[A,B])(x: A): Map[A,Option[B]] =
     Map(x -> os.get(x))
   
-  def createGraphNodeFromProjectAndLinks(pl: (Project,Option[List[Project]])): Set[JITGraphNode] =
-      Set(JITGraphNode(pl._1.id.toString, pl._1.name, pl._2.map( _ map( _.id.toString ))))
+  def createGraphNodeFromProjectAndLinks(pl: (Project,Option[List[Project]])): Map[JITGraphNode,Option[Nothing]] =
+      Map(JITGraphNode(pl._1.id.toString, pl._1.name, pl._2.map( _ map( _.id.toString ))) -> None)
 
 }
