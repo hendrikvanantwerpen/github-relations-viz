@@ -5,58 +5,51 @@ import scala.util.matching.Regex
 import scalaz._
 import Scalaz._
 
-case class User(id:Int,name:String)
-case class Project(id:Int,name:String)
-case class Commit(project:Project,user:User,timestamp:Int)
-case class Link(p1:Project,p2:Project) {
-  def normalize = {
-    if ( p2.id < p1.id ) {
-      Link(p2,p1)
-    } else {
-      this
-    }
+import GHEntities._
+import JITEntities._
+import MapReduce._
+
+class Timer {
+  var t = 0l
+  reset
+  private def reset = {
+    t = System.currentTimeMillis
+    t
   }
-}
-
-case class JITGraphNode(id: String, name: String, adjacencies: Option[List[String]])
-
-object GHRelationsVizApp {
-  import GHRelationsViz._
-
-  def main(args: Array[String]) = {
-    println( getProjectRelations(Int.MinValue,Int.MaxValue) )
+  def tick(s: String) = {
+    val t0 = t
+    val t1 = reset
+    val dt = t1 - t0
+    println(s+": "+dt+"ms")
   }
-  
 }
 
 object GHRelationsViz {
+  
   val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r
   
   def getProjectRelations(from: Int, until: Int) = {
+    val t = new Timer
     val src = Source.fromURL(getClass.getResource("/commits.txt"))
-    val commits = 
-      readCommitsFromSource(src)
-      .filter( isCommitInRange(_, from, until) )
-      .take( 100000 )
-    
-    val projectLinks = 
-      commits
-      .foldLeft(Map.empty:Map[User,Set[Project]])(groupProjectsPerUser)
-      .values.par
-      .flatMap(getAllProjectLinks)
-      .map(_.normalize);
-      
-    val involvedProjects =
-      projectLinks
-      .foldLeft(Set.empty:Set[Project])( (s,l) => s + l.p1 + l.p2 )
-      
-    val projectAdjacencyMap =
-      projectLinks
-      .foldLeft(Map.empty:Map[Project,List[Project]])(createAdjacencyMap);
-      
-    val graphNodes =
-      zipAndMap(involvedProjects, projectAdjacencyMap)( createGraphNodeFromProjectAndLinks )
-      
+    t.tick("created source")
+    val commits = readCommitsFromSource(src)
+    t.tick("read commits")
+    val commitsInRange = commits.filter( isCommitInRange(_, from, until) )
+    t.tick("filtered commits")
+    val limitedCommits = commitsInRange.take( 1000000 )
+    t.tick("took small portion of commits commits")
+    val userProjects = mapReduce(commitToUserProject)(limitedCommits toList)
+    t.tick("mapped projects to users")
+    val projectLinks = mapReduce(getAllNormalizedProjectLinks)(userProjects.values)
+    t.tick("created all project links")
+    val involvedProjects = mapReduce(getProjectsFromLink)(projectLinks)
+    t.tick("iterated all involved projects")
+    val projectAdjacencyMap = mapReduce(createAdjacencyMap)(projectLinks)
+    t.tick("created project adjecancy map")
+    val projectAndOptAdjecancyMap = mapReduce(zipWithOption(projectAdjacencyMap))(involvedProjects)
+    t.tick("zipped projects with optional adjecancy")
+    val graphNodes = mapReduce(createGraphNodeFromProjectAndLinks)(projectAndOptAdjecancyMap)
+    t.tick("created graph nodes")
     graphNodes
   }
   
@@ -64,50 +57,41 @@ object GHRelationsViz {
     src
     .getLines
     .filter(isNotEmpty)
-    .map(parseLine)
-    .toList
+    .map(parseStringToCommit)
 
   def isNotEmpty(str: String) = !(str isEmpty)
+  
+  def parseStringToCommit(line: String) = {
+    val TReg(pId, pName, uId, uName, ts) = line
+    Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt)
+  }  
   
   def isCommitInRange(c: Commit, from: Int, until: Int) = 
     c.timestamp >= from && c.timestamp <= until
 
-  /**
-   * Parse a single line from the data into a tuple
-   * @param line the input line as string
-   * @return the tuple with data
-   */
-  def parseLine(line: String) = {
-    val TReg(pId, pName, uId, uName, ts) = line
-    Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt)
-  }
-  
-  def groupProjectsPerUser(state: Map[User,Set[Project]], commit: Commit): Map[User,Set[Project]] = {
-    state |+| Map((commit.user,Set(commit.project)))
-  }
+  def commitToUserProject(c: Commit): Map[User,Set[Project]] =
+    Map(c.user -> Set(c.project))
 
-  def getAllProjectLinks(ps: Set[Project]) = {
+  def getProjectsFromLink(l: Link): Set[Project] = {
+    Set(l.p1,l.p2)
+  }
+    
+  def getAllNormalizedProjectLinks(ps: Set[Project]): List[Link] =
     ps
     .subsets(2)
     .map( (ss) => {
         val l = ss.toList
-        Link(l(0),l(1))
-      } )
-  }
+        Link(l(0),l(1)).normalize
+    } ) toList
   
-  def createAdjacencyMap(state: Map[Project,List[Project]], link: Link): Map[Project,List[Project]] = {
-    state |+| Map((link.p1,List(link.p2)))
+  def createAdjacencyMap(link: Link): Map[Project,List[Project]] = {
+    Map((link.p1,List(link.p2)))
   }
 
-  def zipAndMap[A,B,C](as: Set[A], bs: Map[A,B])(f: (A,Option[B]) => C): List[C] = {
-    def acc(res: List[C], rest: List[A]): List[C] = rest match {
-      case Nil => res
-      case h::ts => acc( f(h, bs get h) :: res, ts )
-    }
-    acc(Nil, as.toList)
-  }
+  def zipWithOption[A,B](os: Map[A,B])(x: A): Map[A,Option[B]] =
+    Map(x -> os.get(x))
   
-  def createGraphNodeFromProjectAndLinks(p: Project, as:Option[List[Project]]) = 
-      JITGraphNode(p.id.toString, p.name, as map( _ map( _.id.toString )))
+  def createGraphNodeFromProjectAndLinks(pl: (Project,Option[List[Project]])): Set[JITGraphNode] =
+      Set(JITGraphNode(pl._1.id.toString, pl._1.name, pl._2.map( _ map( _.id.toString ))))
 
 }

@@ -1,0 +1,8 @@
+1001 someproject1 101 someuser1 200
+1002 someproject2 101 someuser1 300
+1003 someproject3 101 someuser1 500
+1001 someproject1 102 someuser2 300
+1002 someproject2 102 someuser2 400
+1001 someproject1 103 someuser3 200
+1002 someproject2 103 someuser3 500
+1001 someproject1 104 someuser4 400
