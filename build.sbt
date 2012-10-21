@@ -13,6 +13,7 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
+  "com.github.scala-incubator.io" %% "scala-io-core" % "0.4.1",
   "org.scalaz" %% "scalaz-core" % "6.0.4",
   "org.scalatra" % "scalatra" % "2.1.1",
   "org.scalatra" % "scalatra-scalate" % "2.1.1",
@@ -29,3 +30,17 @@ compile <<= (resourceDirectory in Compile, compile in Compile) map { (rd,result)
   if ( !(f exists) ) throw new Exception("Please copy commits.txt to "+f)
   result
 }
+
+fork in run := true
+
+//connectInput in run := true
+
+javaOptions ++= Seq(
+    //"-verbose:gc",
+    //"-XX:+PrintGCDetails",
+    //"-XX:+PrintGCTimeStamps",
+    //"-XX:+UseConcMarkSweepGC",
+    "-XX:+UseParallelGC",
+    "-Xms2048m",
+    "-Xmx2048m"
+)

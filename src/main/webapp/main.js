@@ -1,13 +1,13 @@
 $(document).ready(function(){
+
+  $.ajaxSetup({
+      cache: false
+  });
+
   var labelType, useGradients, nativeTextSupport, animate;
 
-  var minDate = 1000077749
-  var maxDate = 2145924722
-  var avgDate = Math.round( (minDate + maxDate) / 2 )
-  var dayRange = 604800
-  minTime = avgDate - dayRange
-  maxTime = avgDate + dayRange
-  degree = 0
+  var minTime = maxTime = 0
+  var degree = 1
 
   var ua = navigator.userAgent,
       iStuff = ua.match(/iPhone/i) || ua.match(/iPad/i),
@@ -25,7 +25,7 @@ $(document).ready(function(){
   // init ForceDirected
   var fd = new $jit.ForceDirected({
     //id of the visualization container
-    injectInto: 'infovis',
+    injectInto: 'graphanchor',
     //Enable zooming and panning
     //by scrolling and DnD
     Navigation: {
@@ -52,6 +52,7 @@ $(document).ready(function(){
     Label: {
       type: labelType, //Native or HTML
       size: 4,
+      color: 'black',
       style: 'bold'
     },
     //Add Tips
@@ -116,67 +117,96 @@ $(document).ready(function(){
     }
   });
 
-  $( "#date-range-slider" ).slider({
-    range: true,
-    min: minDate,
-    max: maxDate,
-    values: [ minTime, maxTime ],
-    slide: function( event, ui ) {
-    	minTime =  ui.values[ 0 ];
-    	maxTime = ui.values[ 1 ];
-      	updateGraph();
-    }
-  });
-  
+  function createUI(minDate,maxDate) {
+    $( "#date-range-slider" ).slider({
+      range: true,
+      min: minDate,
+      max: maxDate,
+      values: [ minTime, maxTime ],
+      slide: function( event, ui ) {
+          minTime = ui.values[ 0 ];
+          maxTime = ui.values[ 1 ];
+          updateUI();
+      }
+    });
+    
     $( "#degree-range-slider" ).slider({
-    range: false,
-    min: 0,
-    max: 20,
-    values: [ degree ],
-    slide: function( event, ui ) {
-    	degree=ui.values[0];
-      	updateGraph();
-    }
-  });
+      range: false,
+      min: 1,
+      max: 20,
+      values: [ degree ],
+      slide: function( event, ui ) {
+          degree = ui.values[0];
+          updateUI();
+      }
+    });
+    
+    $( "#refresh" ).button()
+    .click(function(e){
+      refreshGraph();
+      e.preventDefault();
+    });
+  }
 
   function fmtEpoch(e) {
-  	return new Date(1000*e).toString();
+      return new Date(1000*e).toString();
   }
   
-  function updateGraph() {
-  	var from = minTime;
-  	var to = maxTime;
-  	if($("#statusLabel").html() != 'idle') {
-  		//request.abort();
-  	} else {
-	    $( "#date-range" ).text( fmtEpoch(from)+" - "+fmtEpoch(to));
-	    $('#degree').text(degree )
-	    $("#statusLabel").html('loading...');
-	    request = $.get('/data?from='+from+'&to='+to+'&degree='+degree,function(json){
-	    $("#statusLabel").html('idle');
-	      // load JSON data.
-	      fd.loadJSON(json);
-	      // compute positions incrementally and animate.
-	      fd.computeIncremental({
-	        iter: 200,
-	        property: 'end',
-	        onStep: function(perc){
-	          console.log(perc + '% loaded...');
-	        },
-	        onComplete: function(){
-	        console.log('done');
-	          fd.animate({
-	            modes: ['linear'],
-	            transition: $jit.Trans.Elastic.easeOut,
-	            duration: 2500
-	          });
-	        }
-	      });
-	   
-	   });
+  function updateUI() {
+      $( "#date-range" ).text( fmtEpoch(minTime)+" - "+fmtEpoch(maxTime));
+      $('#degree').text( degree );
+  }
+
+  var request = null;
+  function refreshGraph() {
+      if(request !== null) {
+          request.abort();
+          request = null;
+          refreshGraph();
+      } else {
+        $("#statusLabel").text('loading...');
+        request = $.getJSON('/jitdata?from='+minTime+'&to='+maxTime+'&degree='+degree)
+        .success(function(json){
+          if ( json.length > 0 ) {
+            $("#statusLabel").text('loading json into graph');
+            // load JSON data.
+            fd.loadJSON(json);
+            // compute positions incrementally and animate.
+            fd.computeIncremental({
+              iter: 200,
+              property: 'end',
+              onStep: function(perc){
+                $("#statusLabel").text(perc+'% loaded...');
+              },
+              onComplete: function(){
+                $("#statusLabel").text('animating graph');
+                fd.animate({
+                  modes: ['linear'],
+                  transition: $jit.Trans.Elastic.easeOut,
+                  duration: 2500
+                });
+                request = null;
+                $("#statusLabel").text('graph rendered - ready');
+              }
+            });
+          } else {
+            request = null;
+            $("#statusLabel").text('empty graph - ready');
+          }
+        })
+        .error(function(){
+         $("#statusLabel").text('error');
+         request = null;
+       });
      }
   }
 
-  updateGraph()
+  $("#statusLabel").text('getting date range');
+  $.getJSON('/range')
+  .success(function(range){
+    minTime = maxTime = range.min
+    createUI(range.min,range.max);
+    $("#statusLabel").text('ready');
+  });
 
 });

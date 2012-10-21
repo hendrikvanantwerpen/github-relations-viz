@@ -7,19 +7,20 @@ import net.liftweb.json.Printer._
 
 
 object GHRelationsApp extends App {
-
   
-  val src = scala.io.Source.fromURL(getClass.getResource("/commits.txt"))
-  val proc = new GHRelationsViz(src)
-  val raw = proc.getProjectRelations(Int.MinValue,Int.MaxValue,1)
+  val proc = new GHRelationsViz(getClass.getResource("/commits.txt"))
+  val range = proc.getLimits
+  println("Found range "+range.min+" to "+range.max)
+  val links = proc.getProjectLinks(Int.MinValue,Int.MaxValue,1)
   
+  /*
   implicit val formats = net.liftweb.json.DefaultFormats
-  
-  val output = pretty(render(decompose(raw)))
+  val json = pretty(render(decompose(links)))
   val out = new java.io.FileWriter("output.json")
-  out.write(output)
+  out.write(json)
   out.close
   
-  println(output)
+  println(json)
+  */
 
 }
