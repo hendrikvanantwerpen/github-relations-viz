@@ -6,7 +6,7 @@ import Multoids._
 import MapReduce._
 import scala.math.Ordering
 
-object MultoidsTest extends App {
+object MapReduceTests extends App {
   
   val words = List("aap","anders","bijna","boer","noot","mies","meisje","zaag","zonder","fiets","zonder","aap","mies","aap")
   
