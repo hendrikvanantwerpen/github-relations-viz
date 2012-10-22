@@ -14,10 +14,9 @@ class GHRelationsViz(url: URL) {
   import GHRelationsViz._
 
   val PERIOD = 7 * 24 * 3600
-  val LIMIT = 5e6.toInt
   
   val commits = timed("read and reduce commits") {
-    val cs = readCommitsFromURL(url).take( LIMIT )
+    val cs = readCommitsFromURL(url)
     mapReduce[Commit,Commit,Set[Commit]](binCommitByPeriod(PERIOD))(cs)
   }
   println("processing "+commits.size+" commits")

@@ -144,23 +144,19 @@ object Multoids {
       override def insert(c: Value, a: Value) = m.append(c,a)
     }
 
-  /* this one is not explicit because it causes ambiguitues with
-   * the map multoid, apparently there's no more-specific preference here
-   */
-  def CollectionMultoid[Elem, Repr[X] <: TraversableOnce[X]]
-      (bf: CanBuildFrom[Repr[Elem],Elem,Repr[Elem]]) =
-    new Multoid[Repr[Elem],Elem] {
-      override def nil = bf().result
-      override def insert(c: Repr[Elem], a: Elem) = (bf(c) ++=(c) +=(a)).result
-    }
-
   implicit def SeqMultoid[Elem, Repr[X] <: Seq[X]]
                (implicit bf: CanBuildFrom[Repr[Elem],Elem,Repr[Elem]]) =
-    CollectionMultoid[Elem, Repr](bf)
+    new Multoid[Repr[Elem],Elem] {
+      override def nil = bf().result
+      override def insert(c: Repr[Elem], a: Elem) = (a +: c).asInstanceOf[Repr[Elem]]
+    }
 
   implicit def SetMultoid[Elem, Repr[X] <: Set[X]]
                (implicit bf: CanBuildFrom[Repr[Elem],Elem,Repr[Elem]]) =
-    CollectionMultoid[Elem, Repr](bf)
+    new Multoid[Repr[Elem],Elem] {
+      override def nil = bf().result
+      override def insert(c: Repr[Elem], a: Elem) = (c + a).asInstanceOf[Repr[Elem]]
+    }
 
   implicit def Tuple2Multoid[C1,V1,C2,V2]
                (implicit ma: Multoid[C1,V1], mb: Multoid[C2,V2]) =
@@ -174,7 +170,7 @@ object Multoids {
     new Multoid[Repr[Key,Value],(Key,Elem)] {
       override def nil = bf().result
       override def insert(c: Repr[Key,Value], a: (Key,Elem)) =
-        (bf(c) ++=(c) +=(a._1 -> c.get( a._1 ).map( v => m.insert(v,a._2) ).getOrElse( m.insert(m.nil,a._2) ))).result
+        (c + (a._1 -> c.get( a._1 ).map( v => m.insert(v,a._2) ).getOrElse( m.insert(m.nil,a._2) ))).asInstanceOf[Repr[Key,Value]]
     }
 
 }
