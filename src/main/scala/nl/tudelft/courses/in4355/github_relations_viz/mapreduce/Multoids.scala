@@ -88,5 +88,10 @@ object Multoids {
         ).asInstanceOf[Repr[Key,Value]]
     }
 
+  class MultoidIdentity[Coll](c: Coll) {
+    def |<|[Elem](e: Elem)(implicit m: Multoid[Coll,Elem]) = m.insert(c, e)
+  }
+  implicit def mkMultoid[Coll](c: Coll) = new MultoidIdentity[Coll](c)
+
 }
 
