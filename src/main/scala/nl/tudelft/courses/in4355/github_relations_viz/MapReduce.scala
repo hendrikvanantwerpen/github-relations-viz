@@ -9,7 +9,7 @@ object MapReduce {
   def mapReduce[Elem,ResultElem,ResultColl](f: Elem => ResultElem)(as: TraversableOnce[Elem])(implicit p: Multoid[ResultColl,ResultElem]) =
   	(p.nil /: as)( (c,a) => p.insert(c,f(a)))
     
-  def mapReduceI[Elem,ResultElem,ResultColl](f: Elem => TraversableOnce[ResultElem])(as: Traversable[Elem])(implicit p: Multoid[ResultColl,ResultElem]) =
+  def flatMapReduce[Elem, ResultElem, ResultColl](f: Elem => TraversableOnce[ResultElem])(as: Traversable[Elem])(implicit p: Multoid[ResultColl,ResultElem]) =
   	(p.nil /: as)( (c,a) => (c /: f(a))( (cc,aa) =>  p.insert(cc,aa) ) )
     
 }

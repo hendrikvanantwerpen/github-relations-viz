@@ -36,7 +36,7 @@ class GHRelationsViz(url: URL) {
     val userProjects = timed("group projects per user") { mapReduce[Commit,(User,Project),Map[User,Set[Project]]](groupProjectByUser)(commitsInRange) }
     println("found "+userProjects.size+" users with projects")
     
-    val projectLinkMap = timed("get all project links") { mapReduceI[Set[Project],(Link,Int),Map[Link,Int]](projectsToLinks)(userProjects.values) }
+    val projectLinkMap = timed("get all project links") { flatMapReduce[Set[Project],(Link,Int),Map[Link,Int]](projectsToLinks)(userProjects.values) }
     println("found "+projectLinkMap.size+" project links")
 
     val bigProjectLinks = timed("filter links by degree") { projectLinkMap.filter( _._2 >= minDegree ) }
@@ -65,7 +65,7 @@ class GHRelationsViz(url: URL) {
     import net.liftweb.json.JsonDSL._
     val links = getProjectLinks(from, until, minDegree)
     
-    val involvedProjects = timed("get all projects") { mapReduceI[Link,Project,Set[Project]](linksToProjects)(links.keySet).toList }
+    val involvedProjects = timed("get all projects") { flatMapReduce[Link,Project,Set[Project]](linksToProjects)(links.keySet).toList }
     println("total involved projects is "+involvedProjects.size)
     
     val pvnodes = involvedProjects.map( p => {

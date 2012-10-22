@@ -127,9 +127,12 @@ object Multoids {
    *    The trick was to make Repr explicit in the implicit function, although it
    *    is not in the resulting Multoid
    *  - Monoids are auto wrapped in multoids to continue the work
-   * Todo
-   *  - Drop the builders, but do it in a typesafe matter (not asInstanceOf)
-   *    This makes it very slow again, many objects created and copied
+   *  - Use builders only to create initial type, then use fast collection appends
+   *    This is needed because otherwise we rebuild the collection for every element
+   *  - The combination of the map functions return type and the mapReduce return type
+   *    makes selecting wether a Multoid or a Monoid is needed unambiguous. Maybe
+   *    collections with values of the same collection type might give trouble,
+   *    in that case you can always build the multoid explicitly.
    */
 
   trait Multoid[Coll,Elem] {
@@ -165,6 +168,20 @@ object Multoids {
       override def insert(c: (C1,C2), v: (V1,V2)) = (ma.insert(c._1, v._1), mb.insert(c._2, v._2))
     }
 
+  implicit def Tuple3Multoid[C1,V1,C2,V2,C3,V3]
+               (implicit ma: Multoid[C1,V1], mb: Multoid[C2,V2], mc: Multoid[C3,V3]) =
+    new Multoid[(C1,C2,C3),(V1,V2,V3)] {
+      override def nil = (ma.nil, mb.nil, mc.nil)
+      override def insert(c: (C1,C2,C3), v: (V1,V2,V3)) = (ma.insert(c._1,v._1), mb.insert(c._2,v._2), mc.insert(c._3,v._3))
+    }
+
+  implicit def Tuple4Multoid[C1,V1,C2,V2,C3,V3,C4,V4]
+               (implicit ma: Multoid[C1,V1], mb: Multoid[C2,V2], mc: Multoid[C3,V3], md: Multoid[C4,V4]) =
+    new Multoid[(C1,C2,C3,C4),(V1,V2,V3,V4)] {
+      override def nil = (ma.nil, mb.nil, mc.nil, md.nil)
+      override def insert(c: (C1,C2,C3,C4), v: (V1,V2,V3,V4)) = (ma.insert(c._1,v._1), mb.insert(c._2,v._2), mc.insert(c._3,v._3), md.insert(c._4,v._4))
+    }
+
   implicit def MapMultoid[Key, Value, Repr[K,V] <: Map[K,V], Elem]
                (implicit m: Multoid[Value,Elem], bf: CanBuildFrom[Repr[Key,Value], (Key,Value), Repr[Key,Value]]) =
     new Multoid[Repr[Key,Value],(Key,Elem)] {
@@ -186,9 +203,13 @@ object MultoidsTest extends App {
   val wordMap = mapReduce[String,(String,Int),Map[String,Int]](wordCount)(words)
   println(wordMap)
 
-  def wordLength(s: String) = (s.size,s)
-  val wordLengths = mapReduce[String,(Int,String),SortedMap[Int,String]](wordLength)(words)
-  println(wordLengths)
+  def wordPlusLength(s: String) = (s.size,s)
+  val wordPlusLengths = mapReduce[String,(Int,String),SortedMap[Int,String]](wordPlusLength)(words)
+  println(wordPlusLengths)
+
+  def wordLength(s: String) = s.size
+  val totalLength = mapReduce[String,Int,Int](wordLength)(words)
+  println(totalLength)
   
   def countAndConcat(s: String) = (1,s)
   implicit val oops = MonoidMultoid[(Int,String)]
