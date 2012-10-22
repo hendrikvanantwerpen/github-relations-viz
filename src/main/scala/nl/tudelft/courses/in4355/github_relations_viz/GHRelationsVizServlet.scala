@@ -25,12 +25,12 @@ class GHRelationsVizServlet extends ScalatraServlet {
     write(processor.getJITData(from,to,minDegree))
   }
     
-  get("/protovisdata") {
+  get("/d3data") {
     val from = params get "from" map( _.toInt ) getOrElse( Int.MinValue )
     val to = params get "to" map( _.toInt ) getOrElse( Int.MaxValue )
     val minDegree = params get "degree" map( d => math.max(1,d.toInt) ) getOrElse( 1 )
     contentType = "application/json;charset=UTF-8"
-    write(processor.getProtovisData(from,to,minDegree))
+    write(processor.getD3Data(from,to,minDegree))
   }
 
 }

@@ -1,10 +1,8 @@
 package nl.tudelft.courses.in4355.github_relations_viz
 
-
 import net.liftweb.json.JsonAST._
 import net.liftweb.json.Extraction._
 import net.liftweb.json.Printer._    
-
 
 object GHRelationsApp extends App {
   

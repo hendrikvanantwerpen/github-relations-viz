@@ -1,16 +1,16 @@
 package nl.tudelft.courses.in4355.github_relations_viz
 
+import java.net.URL
 import scala.collection.immutable.SortedMap
 import scalaz._
 import Scalaz._
-import Monoids._
-import Multoids._
-import MapReduce._
 import GHEntities._
+import mapreduce.Monoids._
+import mapreduce.Multoids._
+import mapreduce.MapReduce._
 import Timer._
-import java.net.URL
 
-object Playground extends App {
+object ReductionPerformance extends App {
   
   val LIMIT = 1e6.toInt
   val GROUP = 1e5.toInt
@@ -26,7 +26,7 @@ object Playground extends App {
     readLines(resource)
     .drop( 0*LIMIT )
     .take( LIMIT )
-    .map( GHRelationsViz.parseStringToCommit )
+    .flatMap( GHRelationsViz.parseStringToCommit )
     .toList
   }
 
@@ -42,7 +42,7 @@ object Playground extends App {
   })
   
   def mrGroupCommits(w: Int)(cs: Traversable[Commit]) =
-    mapReduce[Commit,(Int,Commit),SortedMap[Int,Set[Commit]]](groupCommits(w))(cs)
+    cs.mapReduce[(Int,Commit),SortedMap[Int,Set[Commit]]](groupCommits(w))
   def groupCommits(w: Int)(c: Commit) = {
     val cc = c.copy(timestamp = c.timestamp - (c.timestamp % w))
     (cc.timestamp -> cc)

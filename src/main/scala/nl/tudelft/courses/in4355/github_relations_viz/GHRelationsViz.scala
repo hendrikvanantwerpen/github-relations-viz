@@ -4,10 +4,11 @@ import java.net.URL
 import java.util.Date
 import scala.io.Source
 import scala.util.matching.Regex
+import D3Entities._
 import GHEntities._
 import JITEntities._
-import ProtovisEntities._
-import MapReduce._
+import mapreduce.MapReduce._
+import mapreduce.Multoids._
 import Timer._
 
 class GHRelationsViz(url: URL) {
@@ -15,11 +16,9 @@ class GHRelationsViz(url: URL) {
 
   val PERIOD = 7 * 24 * 3600
   
-  val commits = timed("read and reduce commits") {
-    val cs = readCommitsFromURL(url)
-    mapReduce[Commit,Commit,Set[Commit]](binCommitByPeriod(PERIOD))(cs)
-  }
-  println("processing "+commits.size+" commits")
+  val commits =
+    readCommitsFromURL(url)
+      .mapReduce[Commit,Set[Commit]](binCommitByPeriod(PERIOD))
 
   /*val limits = timed("calculate limits") { Range(
       (Int.MaxValue /: commits)( (a,c) => math.min(a,c.timestamp) ),
@@ -27,57 +26,55 @@ class GHRelationsViz(url: URL) {
   ) }*/
   
   val epoch2000_01_01 = 946684800
-  def getLimits = Range((new Date(epoch2000_01_01).getTime()/1000).toInt, (new Date().getTime()/1000).toInt)
+  def getLimits = 
+    Range(
+      (new Date(epoch2000_01_01).getTime()/1000).toInt,
+      (new Date().getTime()/1000).toInt
+    )
   
-  def getProjectLinks(from: Int, until: Int, minDegree: Int) = {
-    val commitsInRange = timed("filter commits") { commits.filter( c => isCommitInRange(c, from, until) ) }
-    println("found "+commitsInRange.size+" commits in range")
-    
-    val userProjects = timed("group projects per user") { mapReduce[Commit,(User,Project),Map[User,Set[Project]]](groupProjectByUser)(commitsInRange) }
-    println("found "+userProjects.size+" users with projects")
-    
-    val projectLinkMap = timed("get all project links") { flatMapReduce[Set[Project],(Link,Int),Map[Link,Int]](projectsToLinks)(userProjects.values) }
-    println("found "+projectLinkMap.size+" project links")
-
-    val bigProjectLinks = timed("filter links by degree") { projectLinkMap.filter( _._2 >= minDegree ) }
-    println(bigProjectLinks.size+" links with degree >= "+minDegree+" left")
-    
-    bigProjectLinks
-  }
+  def getProjectLinks(from: Int, until: Int, minDegree: Int) =
+    commits
+      .filter( c => isCommitInRange(c, from, until) )
+      .mapReduce[(User,Project),Map[User,Set[Project]]](groupProjectByUser)
+      .values
+      .flatMapReduce[(Link,Int),Map[Link,Int]](projectsToLinks)
+      .filter( _._2 >= minDegree )
   
   def getJITData(from: Int, until: Int, minDegree: Int) = {
-    val links = getProjectLinks(from, until, minDegree).keySet
-    
-    val (involvedProjects,projectAdjacencyMap) = timed("build adjacency map") { mapReduce[Link,(Set[Project],(Project,Project)),(Set[Project],Map[Project,Set[Project]])](linksToProjectsAndAdjacencyMap)(links) }
-    println("total involved projects is "+involvedProjects.size)
-    println("total projects for adjacancies is "+projectAdjacencyMap.size)
-    
-    val projectAndOptAdjecancyMap = timed("create full graph map") { mapReduce[Project,(Project,Option[Set[Project]]),Map[Project,Option[Set[Project]]]](zipWithOption(projectAdjacencyMap))(involvedProjects) }
-    println("zipped projects with adjacancies")
-    
-    val graphNodes = mapReduce[(Project,Option[Set[Project]]),JITGraphNode,Set[JITGraphNode]](graphMapToGraphNode)(projectAndOptAdjecancyMap)
-    println("created "+graphNodes.size+" graph nodes")
-    
+    val links =
+      getProjectLinks(from, until, minDegree)
+    val (involvedProjects,projectAdjacencyMap) = ( 
+      links.keySet
+        .mapReduce[(Set[Project],(Project,Project)),
+                   (Set[Project],Map[Project,Set[Project]])]
+                  (linksToProjectsAndAdjacencyMap)
+    )
+    val projectAndOptAdjecancyMap = (
+      involvedProjects
+        .mapReduce[(Project,Option[Set[Project]]),
+                   Map[Project,Option[Set[Project]]]]
+                  (zipWithOption(projectAdjacencyMap))
+    )
+    val graphNodes = 
+      projectAndOptAdjecancyMap
+        .mapReduce[JITNode,Set[JITNode]](projectWithAdjacanciesToJITNode)
     graphNodes
   }
   
-  def getProtovisData(from: Int, until: Int, minDegree: Int) = {
-    import net.liftweb.json.JsonDSL._
-    val links = getProjectLinks(from, until, minDegree)
-    
-    val involvedProjects = timed("get all projects") { flatMapReduce[Link,Project,Set[Project]](linksToProjects)(links.keySet).toList }
-    println("total involved projects is "+involvedProjects.size)
-    
-    val pvnodes = involvedProjects.map( p => {
-      ("name" -> p.name)
-    } )
-    val pvlinks = links.map( t => {
-      val l = t._1
-      val v = t._2
-       ("source" -> involvedProjects.indexOf(l.p1)) ~ ("target" -> involvedProjects.indexOf(l.p2)) ~ ("value" -> v)
-    } )
-    
-    ("nodes" -> pvnodes) ~ ("links" -> pvlinks)
+  def getD3Data(from: Int, until: Int, minDegree: Int) = {
+    val links = 
+      getProjectLinks(from, until, minDegree)
+    val involvedProjects =
+      links.keySet
+        .flatMapReduce[Project,Set[Project]](linksToProjects)
+        .toList
+    val d3nodes =
+      involvedProjects
+        .map( projectToD3Node )
+    val d3links =
+      links
+        .map( t => linkToD3Link(involvedProjects)(t._1, t._2) )
+    D3Graph(d3nodes,d3links)
   }
   
 }
@@ -88,18 +85,15 @@ object GHRelationsViz {
   
   def readCommitsFromURL(url: URL) =
     scalax.io.Resource.fromURL(url)
-    .lines()
-    .filter(isNotEmpty)
-    .map( parseStringToCommit )
+      .lines()
+      .flatMap( parseStringToCommit )
 
-  def isNotEmpty(str: String) = !(str isEmpty)
-  
   def parseStringToCommit(str: String) = {
     try {
       val TReg(pId, pName, uId, uName, ts) = str
-      Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt)      
+      Some(Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt))      
     } catch {
-      case ne: NumberFormatException => throw new Exception("Cannot parse: "+str)
+      case _ => None
     }
   }  
 
@@ -114,25 +108,31 @@ object GHRelationsViz {
 
   def projectsToLinks(ps: Set[Project]) = 
     ps.subsets(2)
-    .map( (ss) => {
-      val l = ss.toList
-      (Link(l(0),l(1)).normalize,1)
-    } )
+      .map( (ss) => {
+        val l = ss.toList
+        (Link(l(0),l(1)).normalize,1)
+      } )
   
   def linksToProjectsAndAdjacencyMap(l: Link) =
     (Set(l.p1,l.p2),(l.p1,l.p2))
   
   def zipWithOption[A,B](lookup: Map[A,B])(a: A) =
     (a -> lookup.get(a))
-    
-  def graphMapToGraphNode(pl: (Project,Option[Set[Project]])) = 
-    JITGraphNode(
-         pl._1.id.toString,
-         pl._1.name,
-         pl._2.map(_ map( _.id.toString ))
+
+  def projectWithAdjacanciesToJITNode(pl: (Project,Option[Set[Project]])) = 
+    JITNode(
+      pl._1.id.toString,
+      pl._1.name,
+      pl._2.map(_ map( _.id.toString ))
     )
 
   def linksToProjects(l: Link) =
     Set(l.p1,l.p2)
+
+  def projectToD3Node(p: Project) =
+    new D3Node(p.name)
   
+  def linkToD3Link(lookup: Seq[Project])(l: Link, v: Int) =
+    new D3Link( lookup.indexOf(l.p1), lookup.indexOf(l.p2), v )
+    
 }

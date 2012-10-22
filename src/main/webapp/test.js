@@ -157,7 +157,8 @@ $(document).ready(function(){
       function fmtEpoch(e) {
           return new Date(1000*e).toString();
       }
-      $( "#date-range" ).text( fmtEpoch(minTime)+" - "+fmtEpoch(maxTime));
+      $( "#date-from" ).text( fmtEpoch(minTime) );
+      $( "#date-to" ).text( fmtEpoch(maxTime) );
       $('#degree').text( degree );
   }
 
@@ -171,7 +172,7 @@ $(document).ready(function(){
           updateStatus("try again later - request in progress");
       } else {
         updateStatus('loading...');
-        request = $.getJSON('/protovisdata?from='+minTime+'&to='+maxTime+'&degree='+degree)
+        request = $.getJSON('/d3data?from='+minTime+'&to='+maxTime+'&degree='+degree)
         .success(function(json){
           request = null;
           if ( !$.isEmptyObject(json) ) {

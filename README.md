@@ -10,18 +10,30 @@ canvas is needed for larger graphs (unles we can make them fit), the
 fish-eye is great for exploring. Also the pop-up is handier then the
 labels I think.
 
+What does the data look like? And after different steps?
+What if the data was bigger? Impact on data processing, visualisation?
+
 ## MapReduce
 
 ### Reduction using Monoids
 
-Use Monoids from Scalaz
+Use Monoids from Scalaz. In the map create in instance of the monoid
+and concat them in the reduce.
 
-Only append complete elements, since we do a lot of element mapping on
-small elements, this results in creating a lot of collections for one
-element. Ruins performance completely. A handwritten version using folds
-and maps over Scala's collections worked orders faster, but the fact
-that the mapping and composition logic was mixed was not nice. Also
-combining maps several levels deep was a pain to program.
+The problem is that they only combine monoids. If our monoids are
+collections, like sets or maps, a new set is created for every map
+operation. In our case often every mapreduced element corresponded to one
+new element. This caused the creation of a lot of element, resulting in
+very bad performance. Not only was performance bad, it got worse with
+every next mapReduce, suggesting the the JVM was going down. It seems
+other people have observed the same behaviour with lots of short-lived
+objects are involved: http://stackoverflow.com/a/2189532
+
+To compare: a handwritten version using folds and maps over Scala's
+collections worked orders faster. The fact that mapping and composition
+logic was mixed was obviously not nice. Also the combination logic got
+more complicated with every level that was added and the combination
+logic was reproduced in every fold for the same kind of collections.
 
 ### Reduce elements to collections
 
@@ -41,13 +53,15 @@ infer the multoids over maps and collections, but still only one level
 deep. Also the difference between multoid and monoid values in maps is
 still there.
 
+Note that using the CanBuildFrom approach, the Multoids only work for
+immutable collections. (is this true??)
+
 Performance was bad when we used to builder, because our function is
-called for every element, bu then rebuild the collection using the
+called for every element, but then rebuild the collection using the
 builder. Vast improvement when we used the builder only for the empty
 collection and then appended elements using the normal + operators. These
 messed up the types a bit, giving only a base type, so we cast to the
-correct type. (this works for immutable types, but will it also for
-mutable?)
+correct type.
 
 ### Fully inferred generic multoids
 
@@ -58,6 +72,10 @@ Reformulated the types of the implicit functions so we can access the
 type parameters of the collections we get (e.g. the key and value type of
 map). This allowed us to completely infer multoids that go several levels
 deep. We created general multoids for maps, sets, sequences and tuples.
+
+There are situations where conflicts can occur. E.g. the Tuple2Multoid and
+the Tuple2Monoid both match when the tuple values are Monoids. Haven't found
+a way to resolve this automatically yet. You'll have to pick one by hand. 
 
 Performance of the final solution is very close to using handwritten folds.
 
@@ -76,22 +94,13 @@ Performance of the final solution is very close to using handwritten folds.
     better fit for listitem to listitem operations where the dataset is
     transformed but the size stays the same.
    
-What does the data look like? And after different steps?
-What if the data was bigger? Impact on data processing, visualisation?
+### Integrating MapReduce with collections
 
-It seems a known issue: http://stackoverflow.com/a/2189532
-
-### Chaining mapReduce
-
-Another nice feature would be chaining, where we create a chain of
-mapReducers and call the whole chain on a dataset. The composition problem
-of before (which types can automatically be appended to which collections)
-is no reversed. We want to go from a collection (the previous out)
-to individual elements we can map over. And the previous result might
-not even be a collection. To make this possible we would have to write
-co-multoids corresponding to the multoids that can extract the individual
-values from the collection. This is probably slightly easier than the
-multoids because extraction is only one level deep.
+By using a simple implicit conversion we can add mapReduce and flatMapReduce
+functions to all Traversable types. This was we can chain mapReduce calls but
+also mix them with the regular collection operations. By doing this we can skip
+one type parameter on mapReduce because it can be inferred from the collection
+it is invoked on.
 
 ## Build & Run
 
