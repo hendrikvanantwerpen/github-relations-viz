@@ -4,7 +4,7 @@ import scala.collection.immutable.SortedMap
 import scalaz._
 import Scalaz._
 import Monoids._
-import Pluroids._
+import Multoids._
 import MapReduce._
 import GHEntities._
 import Timer._
@@ -31,34 +31,35 @@ object Playground extends App {
   }
 
   commits.grouped( GROUP ).drop( 0 ).take( 5 ).foreach(cs => {
+    println
     def report(m: SortedMap[Int,Set[Commit]]) = println("have "+m.foldLeft(0)( _ + _._2.size )+" left after grouping")
-    //val resMR = timed("mapReduce chunk") { mrGroupCommits(PERIOD)(cs) }
-    //report(resMR)
+    val resMR = timed("mapReduce chunk") { mrGroupCommits(PERIOD)(cs) }
+    report(resMR)
     val resMFL = timed("monoid foldLeft chunk") { mflGroupCommits(PERIOD)(cs) }
     report(resMFL)
     val resHFL = timed("handmade foldLeft chunk") { hflGroupCommits(PERIOD)(cs) }
     report(resHFL)
   })
   
-  //def mrGroupCommits(w: Int)(cs: Traversable[Commit]) = mapReduceP[Commit,(Int,Commit),SortedMap[Int,Set[Commit]]](groupCommits(w))(cs)
-  //def groupCommits(w: Int)(c: Commit) = {
-  //  val cc = c.copy(timestamp = c.timestamp - (c.timestamp % w))
-  //  (cc.timestamp -> cc)
-  //}
+  def mrGroupCommits(w: Int)(cs: Traversable[Commit]) =
+    mapReduce[Commit,(Int,Commit),SortedMap[Int,Set[Commit]]](groupCommits(w))(cs)
+  def groupCommits(w: Int)(c: Commit) = {
+    val cc = c.copy(timestamp = c.timestamp - (c.timestamp % w))
+    (cc.timestamp -> cc)
+  }
 
   def mflGroupCommits(w: Int)(cs: Traversable[Commit]) = {
     cs.foldLeft(SortedMap.empty[Int,Set[Commit]])( (m,c) => {
-      val t = c.timestamp - (c.timestamp % w)
-      m |+| SortedMap(t -> Set(c.copy(timestamp = t))) 
+      val cc = c.copy(timestamp = c.timestamp - (c.timestamp % w))
+      m |+| SortedMap(cc.timestamp -> Set(cc))
     })
   }
 
   def hflGroupCommits(w: Int)(cs: Traversable[Commit]) = {
     cs.foldLeft(SortedMap.empty[Int,Set[Commit]])( (m,c) => {
-      val t = c.timestamp - (c.timestamp % w)
-      val cc = c.copy(timestamp = t)
-      m + m.get( t ).fold( v => t -> (v + cc), t -> Set(cc) )
+      val cc = c.copy(timestamp = c.timestamp - (c.timestamp % w))
+      m + m.get( cc.timestamp ).fold( v => cc.timestamp -> (v + cc), cc.timestamp -> Set(cc) )
     })
   }  
-  
+ 
 }

@@ -37,6 +37,8 @@ Can we make it run on one machine?
 What does the data look like? And after different steps?
 What if the data was bigger? Impact on data processing, visualisation?
 
+It seems a known issue: http://stackoverflow.com/a/2189532
+
 Build & Run
 -----------
 

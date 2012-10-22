@@ -3,6 +3,7 @@ package nl.tudelft.courses.in4355.github_relations_viz
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit._
 import scala.collection.immutable.{TreeSet,HashSet,SortedSet,TreeMap,HashMap,SortedMap}
+import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 import scalaz._
 import Scalaz._
@@ -11,7 +12,7 @@ import scala.math.Ordering
 
 object Performance extends App {
 
-val numEls = 5e6.toInt
+val numEls = 1e2.toInt
 println("Collection size: "+numEls+" elements")
 
 def chrono[A](f: => A, timeUnit: TimeUnit = MILLISECONDS): (A,Long) = {
@@ -78,6 +79,23 @@ def mergeSuite[A](msg: String)(rs1: List[A], rs2: List[A]) {
   
 }
 
+def appendSuite[A](msg: String)(is: List[A]) = {
+  println
+  println("===========================")
+  println("AppendSuite: "+msg+" - "+is.size)
+  println("===========================")
+
+  testSimple( "Set" ) {
+      is.foldLeft(Set.empty[A])( (s,i) => s + i )
+  }
+  testSimple( "SetBuilder" ) {
+      val bf = implicitly[CanBuildFrom[Set[A],A,Set[A]]]
+      is.foldLeft(Set.empty[A])( (s,i) => {
+          bf(s) ++=(s) +=(i) result
+      } )
+  }
+}
+
 def rands(xs: Traversable[_]) = {
   val rnd = new Random
   xs.map( _ => rnd.nextInt ).toList
@@ -90,16 +108,16 @@ implicit object WrapOrdering extends Ordering[Wrap] {
 }
 
 val values = rands(1 to numEls)
-//buildSuite("Simple", x => x, (x:Int) => x, values)
-//buildSuite("Wrapped", x => Wrap(x), (x:Wrap) => x.value, values)
+val wrapped = values.map( Wrap(_) )
+appendSuite("Simple")(values)
+appendSuite("Wrapped")(wrapped)
+buildSuite("Simple", x => x, (x:Int) => x, values)
+buildSuite("Wrapped", x => Wrap(x), (x:Wrap) => x.value, values)
 
-for ( i <- 5 to 8 ) {
-  val n = Math.pow(10,i).toInt
-  val rs1 = rands(1 to n)
-  val rs2= rands(1 to n)
-  mergeSuite("Simple")(rs1, rs2)
-  mergeSuite("Strings")(rs1.map( _.toString ), rs2.map( _.toString ))
-  mergeSuite("Wrapped")(rs1.map( Wrap(_) ), rs2.map( Wrap(_) ))
-}
+val rs1 = rands(1 to numEls)
+val rs2 = rands(1 to numEls)
+mergeSuite("Simple")(rs1, rs2)
+mergeSuite("Strings")(rs1.map( _.toString ), rs2.map( _.toString ))
+mergeSuite("Wrapped")(rs1.map( Wrap(_) ), rs2.map( Wrap(_) ))
 
 }
