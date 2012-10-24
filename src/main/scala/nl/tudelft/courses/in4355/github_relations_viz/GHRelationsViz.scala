@@ -7,8 +7,9 @@ import scala.util.matching.Regex
 import D3Entities._
 import GHEntities._
 import JITEntities._
-import mapreduce.MapReduce._
-import mapreduce.Multoids._
+import net.van_antwerpen.scala.collection.mapreduce.Monoids._
+import net.van_antwerpen.scala.collection.mapreduce.Aggregators._
+import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Timer._
 
 class GHRelationsViz(url: URL) {
@@ -18,7 +19,7 @@ class GHRelationsViz(url: URL) {
   
   val commits =
     readCommitsFromURL(url)
-      .mapReduce[Commit,Set[Commit]](binCommitByPeriod(PERIOD))
+      .mapReduce[Set[Commit]](binCommitByPeriod(PERIOD))
 
   /*val limits = timed("calculate limits") { Range(
       (Int.MaxValue /: commits)( (a,c) => math.min(a,c.timestamp) ),
@@ -35,9 +36,9 @@ class GHRelationsViz(url: URL) {
   def getProjectLinks(from: Int, until: Int, minDegree: Int) =
     commits
       .filter( c => isCommitInRange(c, from, until) )
-      .mapReduce[(User,Project),Map[User,Set[Project]]](groupProjectByUser)
+      .mapReduce[Map[User,Set[Project]]](groupProjectByUser)
       .values
-      .flatMapReduce[(Link,Int),Map[Link,Int]](projectsToLinks)
+      .flatMapReduce[Map[Link,Int]](projectsToLinks)
       .filter( _._2 >= minDegree )
   
   def getJITData(from: Int, until: Int, minDegree: Int) = {
@@ -45,19 +46,17 @@ class GHRelationsViz(url: URL) {
       getProjectLinks(from, until, minDegree)
     val (involvedProjects,projectAdjacencyMap) = ( 
       links.keySet
-        .mapReduce[(Set[Project],(Project,Project)),
-                   (Set[Project],Map[Project,Set[Project]])]
+        .mapReduce[(Set[Project],Map[Project,Set[Project]])]
                   (linksToProjectsAndAdjacencyMap)
     )
     val projectAndOptAdjecancyMap = (
       involvedProjects
-        .mapReduce[(Project,Option[Set[Project]]),
-                   Map[Project,Option[Set[Project]]]]
+        .mapReduce[Map[Project,Option[Set[Project]]]]
                   (zipWithOption(projectAdjacencyMap))
     )
     val graphNodes = 
       projectAndOptAdjecancyMap
-        .mapReduce[JITNode,Set[JITNode]](projectWithAdjacanciesToJITNode)
+        .mapReduce[Set[JITNode]](projectWithAdjacanciesToJITNode)
     graphNodes
   }
   
@@ -66,7 +65,7 @@ class GHRelationsViz(url: URL) {
       getProjectLinks(from, until, minDegree)
     val involvedProjects =
       links.keySet
-        .flatMapReduce[Project,Set[Project]](linksToProjects)
+        .flatMapReduce[Set[Project]](linksToProjects)
         .toList
     val d3nodes =
       involvedProjects

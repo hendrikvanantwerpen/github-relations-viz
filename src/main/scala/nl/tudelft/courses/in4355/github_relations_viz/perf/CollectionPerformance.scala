@@ -7,7 +7,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 import scalaz._
 import Scalaz._
-import mapreduce.Monoids._
+import net.van_antwerpen.scala.collection.mapreduce.Monoids._
 import scala.math.Ordering
 
 object CollectionPerformance extends App {
