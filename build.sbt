@@ -37,13 +37,3 @@ compile <<= (resourceDirectory in Compile, compile in Compile) map { (rd,result)
 fork in run := true
 
 //connectInput in run := true
-
-javaOptions ++= Seq(
-    //"-verbose:gc",
-    //"-XX:+PrintGCDetails",
-    //"-XX:+PrintGCTimeStamps",
-    //"-XX:+UseConcMarkSweepGC",
-    "-XX:+UseParallelGC",
-    "-Xms2048m",
-    "-Xmx2048m"
-)
