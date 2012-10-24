@@ -27,13 +27,15 @@ object ReductionPerformance extends App {
     readLines(resource)
     .drop( 0*LIMIT )
     .take( LIMIT )
+    .par
     .flatMap( GHRelationsViz.parseStringToCommit )
-    .toList
+    .seq
   }
 
-  commits.grouped( GROUP ).drop( 0 ).take( 5 ).foreach( cs => {
+  commits.grouped( GROUP ).drop( 0 ).take( 5 ).foreach( group => {
     def report(m: SortedMap[Int,Set[Commit]]) = println("have "+m.foldLeft(0)( _ + _._2.size )+" left after grouping")
     println
+    val cs = group.par
     val resHFL = timed("handmade foldLeft chunk") { hflGroupCommits(PERIOD)(cs) }
     report(resHFL)
     val resMR = timed("mapReduce chunk") { mrGroupCommits(PERIOD)(cs) }
