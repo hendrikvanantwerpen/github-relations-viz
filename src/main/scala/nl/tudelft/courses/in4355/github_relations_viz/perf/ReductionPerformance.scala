@@ -6,8 +6,8 @@ import scala.collection.immutable.SortedMap
 import scalaz._
 import Scalaz._
 import GHEntities._
-import net.van_antwerpen.scala.collection.mapreduce.Monoids._
-import net.van_antwerpen.scala.collection.mapreduce.Aggregators._
+import net.van_antwerpen.scala.collection.mapreduce.Monoid._
+import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Timer._
 
