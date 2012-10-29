@@ -98,6 +98,10 @@ object GHRelationsViz {
 
   def isCommitInRange(c: Commit, from: Int, until: Int) = 
     c.timestamp >= from && c.timestamp <= until
+    
+  def isActorTask(c: Commit, divisor: Int, remainder: Int) =
+      c.user.id%divisor==remainder
+    
 
   def groupProjectByUser(c: Commit) =
     (c.user,c.project)
