@@ -19,11 +19,14 @@ class GHObtainLinks(url: URL, divisor: Int, remainder: Int, maxLines: Int) {
 	
 	
 	def obtainLinks(from: Int, until: Int) = {
-	  commits
-	      .filter( c => isCommitInRange(c, from, until) )
-	      .mapReduce[Map[User,Set[Project]]](groupProjectByUser)
-	      .values
-	      .flatMapReduce[Map[Link,Int]](projectsToLinks)
+	  println("Started filtering %d lines".format(commits.size))
+	 val filtered = commits.filter( c => isCommitInRange(c, from, until) )
+	 println("Done filtering, result is %d lines".format(filtered.size))
+	 val grouped = filtered.mapReduce[Map[User,Set[Project]]](groupProjectByUser)
+	 println("Done grouping. Result is %d size".format(grouped.size))
+	 val links = grouped.values.flatMapReduce[Map[Link,Int]](projectsToLinks)
+	 println("Done creating links. Size is %d".format(links.size))
+	 links
 	}
 	
 	

@@ -13,7 +13,8 @@ class LinkReaderActor() extends Actor{
 	def receive = {
 	  case obtainLinks(from, until) =>
 	    println("Obtaining links from %d, to %d.".format(from, until))
-	    sender ! computeEngine.obtainLinks(from, until)
+	    val links = computeEngine.obtainLinks(from, until)
+	    sender ! linkResult(links)
 	  case _ =>
 	    println("linkReader received unknown command...")
 	}
