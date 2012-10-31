@@ -2,18 +2,17 @@ package nl.tudelft.courses.in4355.github_relations_viz.actors
 import com.typesafe.config.ConfigFactory
 import akka.actor.{ ActorRef, Props, Actor, ActorSystem }
 import java.io.File
+import akka.actor.UntypedActorFactory
 
 //The actor
-class LinkReaderActor() extends Actor{
+class LinkReaderActor(divisor: Int, remainder: Int) extends Actor{
 	val url = getClass.getResource("/commits.txt")
-	val divisor = 1
-	val remainder = 0
-	val maxLines = 10000
-	val computeEngine = new GHObtainLinks(url, divisor, remainder, maxLines)
+	val computeEngine = new GHObtainLinks(url, divisor, remainder)
 	def receive = {
 	  case obtainLinks(from, until) =>
-	    println("Obtaining links from %d, to %d.".format(from, until))
+	    println("Actor "+this.toString()+" Obtaining links from %d, to %d.".format(from, until))
 	    val links = computeEngine.obtainLinks(from, until)
+	    println("Actor "+this.toString()+" Sending result back"+links.toString)
 	    sender ! linkResult(links)
 	  case _ =>
 	    println("linkReader received unknown command...")
@@ -24,7 +23,14 @@ class LinkReaderActor() extends Actor{
 //Class used to manage the actors
 class linkReaderApplication() {
   val system = ActorSystem("ProjectLinkApplication", ConfigFactory.load.getConfig("linkcalculator"))
-  val actor = system.actorOf(Props[LinkReaderActor], "linkReader1")
+  val numActors = 4;
+  
+  for(remainder <- 0 to numActors-1) {
+    createActor(system, numActors, remainder)
+  }
+  
+  
+  
   //#setup
 
   def startup() {
@@ -32,6 +38,12 @@ class linkReaderApplication() {
 
   def shutdown() {
     system.shutdown()
+  }
+  
+  //Creates an actor for the given properties
+  def createActor(system: ActorSystem, divisor: Int, remainder: Int) = {
+    println("Creating actor with name: "+"linkreader-%d-%d".format(divisor, remainder))
+    system.actorOf(Props(new LinkReaderActor(divisor,remainder)), "linkreader-%d-%d".format(divisor, remainder));
   }
 }
 //And the end of that same class

@@ -8,10 +8,10 @@ import net.van_antwerpen.scala.collection.mapreduce.Monoid._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 
-class GHObtainLinks(url: URL, divisor: Int, remainder: Int, maxLines: Int) {
+class GHObtainLinks(url: URL, divisor: Int, remainder: Int) {
 	private val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
 
-	println("Reading commits for modulo %d and remainder %d and a maximum of &d lines".format(divisor, remainder, maxLines))
+	println("Reading commits for modulo %d and remainder %d".format(divisor, remainder))
 	val commits = readActorCommitsFromURL(divisor, remainder)
 	println("Done reading commits: "+commits.size);
 	
@@ -19,7 +19,9 @@ class GHObtainLinks(url: URL, divisor: Int, remainder: Int, maxLines: Int) {
 	
 	
 	def obtainLinks(from: Int, until: Int) = {
-	  println("Started filtering %d lines".format(commits.size))
+	  //Size uitrekenen kost 1 minuut? Oja, niet geordent :P
+	  println("Started filtering lines")
+	  //println("Started filtering %d lines".format(commits.size))
 	 val filtered = commits.filter( c => isCommitInRange(c, from, until) )
 	 println("Done filtering, result is %d lines".format(filtered.size))
 	 val grouped = filtered.mapReduce[Map[User,Set[Project]]](groupProjectByUser)
