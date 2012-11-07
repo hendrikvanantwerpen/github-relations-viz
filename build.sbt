@@ -14,6 +14,8 @@ resolvers ++= Seq(
   "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
 )
 
+seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
+
 libraryDependencies ++= Seq(
   "com.github.scala-incubator.io" %% "scala-io-core" % "0.4.1",
   "org.scalaz" %% "scalaz-core" % "6.0.4",
@@ -34,6 +36,9 @@ compile <<= (resourceDirectory in Compile, compile in Compile) map { (rd,result)
   if ( !(f exists) ) throw new Exception("Please copy commits.txt to "+f)
   result
 }
+
+
+mainClass := Some("nl.tudelft.courses.in4355.github_relations_viz.actors.lrApp")
 
 fork in run := true
 

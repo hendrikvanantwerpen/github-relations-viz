@@ -10,3 +10,9 @@ target/
 /.settings/
 /src/main/resources/commits.txt
 /src/main/webapp/Jit/
+
+commits/commits.txt
+
+commits/projects.txt
+
+commits/users.txt

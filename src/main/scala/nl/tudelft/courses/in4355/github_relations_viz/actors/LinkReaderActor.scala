@@ -3,10 +3,11 @@ import com.typesafe.config.ConfigFactory
 import akka.actor.{ ActorRef, Props, Actor, ActorSystem }
 import java.io.File
 import akka.actor.UntypedActorFactory
-
+import java.net.URL
 //The actor
-class LinkReaderActor(divisor: Int, remainder: Int) extends Actor{
-	val url = getClass.getResource("/commits.txt")
+class LinkReaderActor(divisor: Int, remainder: Int, resource : String) extends Actor{
+	val url = new URL("file://"+resource + "/commits.txt")
+	println("Obtaining compute engine with url: "+"("+url+")")
 	val computeEngine = new GHObtainLinks(url, divisor, remainder)
 	def receive = {
 	  case obtainLinks(from, until) =>
@@ -21,13 +22,19 @@ class LinkReaderActor(divisor: Int, remainder: Int) extends Actor{
 //End of the actor
 
 //Class used to manage the actors
-class linkReaderApplication() {
+class linkReaderApplication(resource : String) {
   val system = ActorSystem("ProjectLinkApplication", ConfigFactory.load.getConfig("linkcalculator"))
-  val numActors = 4;
+  val numActors = 8;
   
-  for(remainder <- 0 to numActors-1) {
-    createActor(system, numActors, remainder)
-  }
+  val url = getClass.getResource("/actorConf.txt")
+  val lines = scalax.io.Resource.fromURL(url).lines().map(_.toInt)
+ // lines.foreach(r => println(r));
+  
+  
+  lines.foreach(remainder => createActor(system, numActors, remainder)) 
+  
+
+
   
   
   
@@ -43,7 +50,7 @@ class linkReaderApplication() {
   //Creates an actor for the given properties
   def createActor(system: ActorSystem, divisor: Int, remainder: Int) = {
     println("Creating actor with name: "+"linkreader-%d-%d".format(divisor, remainder))
-    system.actorOf(Props(new LinkReaderActor(divisor,remainder)), "linkreader-%d-%d".format(divisor, remainder));
+    system.actorOf(Props(new LinkReaderActor(divisor,remainder, resource)), "linkreader-%d-%d".format(divisor, remainder));
   }
 }
 //And the end of that same class
@@ -51,8 +58,19 @@ class linkReaderApplication() {
 //The main method
 object lrApp {
   def main(args: Array[String]) {
+    if(args.size < 1) {
+    	println("Please pass an url to the data directory")
+    	return
+    }
+    println("Initializing lrApp on resource directory %s".format(args.head))
+
+	if(! new File(args.head).exists()) {
+		println("Resource directory not found: "+args.head)
+		return
+	}
+ 
     println("Initializing the linkreader application")
-    new linkReaderApplication()
+    new linkReaderApplication(args.head)
     println("Started linkReaderApplication - waiting for messages")
   }
 }
