@@ -36,14 +36,14 @@ class LinkcombineApplication {
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   
   val remoteActorUrls = List(
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-0", 
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-1",
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-2",
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-3",
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-4",
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-5",
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-6",
-      "akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-7"
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-0", 
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-1",
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-2",
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-3",
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-4",
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-5",
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-6",
+      "akka://ProjectLinkApplication@188.165.237.154:2552/user/linkreader-8-7"
   )
   
   
@@ -53,7 +53,7 @@ class LinkcombineApplication {
     val remoteActors = for (u <- remoteActorUrls) yield system.actorFor(u)
    
     //Debug zooi
-    val remote = system.actorFor("akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-0");
+   // val remote = system.actorFor("akka://ProjectLinkApplication@127.0.0.1:2552/user/linkreader-4-0");
   	//actor ! (remote, op);
     /**
   	println("Done sending request");
