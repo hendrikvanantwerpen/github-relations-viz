@@ -96,6 +96,20 @@ object GHRelationsViz {
     }
   }  
 
+  def parseStringToCommitFiltered(from: Int, to: Int, period: Int)(str: String) = {
+    try {
+      val TReg(pId, pName, uId, uName, ts) = str
+      val t = ts.toInt
+      val tt = t - (t % period)
+      if ( tt >= from && tt <= to )
+        Some(Commit(Project(pId.toInt,pName),User(uId.toInt,uName),tt))
+      else
+        None
+    } catch {
+      case _ => None
+    }
+  }
+  
   def isCommitInRange(c: Commit, from: Int, until: Int) = 
     c.timestamp >= from && c.timestamp <= until
     
