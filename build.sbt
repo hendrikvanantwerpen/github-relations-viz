@@ -31,13 +31,6 @@ libraryDependencies ++= Seq(
 "com.typesafe.akka" % "akka-remote" % "2.0.3"
 )
 
-compile <<= (resourceDirectory in Compile, compile in Compile) map { (rd,result) =>
-  val f = rd / "/commits.txt"
-  if ( !(f exists) ) throw new Exception("Please copy commits.txt to "+f)
-  result
-}
-
-
 mainClass := Some("nl.tudelft.courses.in4355.github_relations_viz.actors.lrApp")
 
 fork in run := true

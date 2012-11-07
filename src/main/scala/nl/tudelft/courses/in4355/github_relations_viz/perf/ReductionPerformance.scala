@@ -2,12 +2,13 @@ package nl.tudelft.courses.in4355.github_relations_viz
 
 import java.net.URL
 import scala.collection._
-import scala.collection.immutable.SortedMap
+import scala.collection.immutable.{Map,SortedMap}
 import scalaz._
 import Scalaz._
 import GHEntities._
-import net.van_antwerpen.scala.collection.mapreduce.Monoid._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
+import net.van_antwerpen.scala.collection.mapreduce.CollectionAggregators._
+import net.van_antwerpen.scala.collection.mapreduce.ValueAggregators._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Timer._
 
@@ -33,7 +34,7 @@ object ReductionPerformance extends App {
   }
 
   commits.grouped( GROUP ).drop( 0 ).take( 5 ).foreach( group => {
-    def report(m: SortedMap[Int,Set[Commit]]) = println("have "+m.foldLeft(0)( _ + _._2.size )+" left after grouping")
+    def report(m: Map[Int,Set[Commit]]) = println("have "+m.foldLeft(0)( _ + _._2.size )+" left after grouping")
     println
     val cs = group.par
     val resHFL = timed("handmade foldLeft chunk") { hflGroupCommits(PERIOD)(cs) }
@@ -52,9 +53,9 @@ object ReductionPerformance extends App {
   }
 
   def mflGroupCommits(w: Int)(cs: GenTraversableOnce[Commit]) = {
-    cs.foldLeft(SortedMap.empty[Int,Set[Commit]])( (m,c) => {
+    cs.foldLeft(Map.empty[Int,Set[Commit]])( (m,c) => {
       val cc = c.copy(timestamp = c.timestamp - (c.timestamp % w))
-      m |+| SortedMap(cc.timestamp -> Set(cc))
+      m |+| Map(cc.timestamp -> Set(cc))
     })
   }
 

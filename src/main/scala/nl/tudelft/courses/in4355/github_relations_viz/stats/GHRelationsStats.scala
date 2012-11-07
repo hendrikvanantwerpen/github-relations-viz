@@ -7,8 +7,9 @@ import scala.collection.immutable.SortedMap
 
 import scalaz._
 import Scalaz._
-import net.van_antwerpen.scala.collection.mapreduce.Monoid._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
+import net.van_antwerpen.scala.collection.mapreduce.CollectionAggregators._
+import net.van_antwerpen.scala.collection.mapreduce.ValueAggregators._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 
 case class User(id:Int,name:String)

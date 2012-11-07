@@ -7,10 +7,10 @@ import scala.util.matching.Regex
 import D3Entities._
 import GHEntities._
 import JITEntities._
-import net.van_antwerpen.scala.collection.mapreduce.Monoid._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
+import net.van_antwerpen.scala.collection.mapreduce.CollectionAggregators._
+import net.van_antwerpen.scala.collection.mapreduce.ValueAggregators._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
-import Timer._
 
 class GHRelationsViz(url: URL) {
   import GHRelationsViz._
@@ -51,7 +51,7 @@ class GHRelationsViz(url: URL) {
     )
     val projectAndOptAdjecancyMap = (
       involvedProjects
-        .mapReduce[Map[Project,Option[Set[Project]]]]
+        .mapReduce[Map[Project,Set[Project]]]
                   (zipWithOption(projectAdjacencyMap))
     )
     val graphNodes = 
@@ -122,11 +122,11 @@ object GHRelationsViz {
   def zipWithOption[A,B](lookup: Map[A,B])(a: A) =
     (a -> lookup.get(a))
 
-  def projectWithAdjacanciesToJITNode(pl: (Project,Option[Set[Project]])) = 
+  def projectWithAdjacanciesToJITNode(pl: (Project,Set[Project])) = 
     JITNode(
       pl._1.id.toString,
       pl._1.name,
-      pl._2.map(_ map( _.id.toString ))
+      pl._2.map( _.id.toString )
     )
 
   def linksToProjects(l: Link) =

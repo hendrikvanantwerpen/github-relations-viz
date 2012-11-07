@@ -3,6 +3,8 @@ import com.typesafe.config.ConfigFactory
 import akka.actor.{ ActorRef, Props, Actor, ActorSystem }
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities.Link
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
+import net.van_antwerpen.scala.collection.mapreduce.CollectionAggregators._
+import net.van_antwerpen.scala.collection.mapreduce.ValueAggregators._
 import akka.dispatch.Future
 import akka.pattern.{ ask, pipe }
 import akka.util.Timeout
