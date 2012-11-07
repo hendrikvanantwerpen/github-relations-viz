@@ -102,6 +102,27 @@ also mix them with the regular collection operations. By doing this we can skip
 one type parameter on mapReduce because it can be inferred from the collection
 it is invoked on.
 
+## Performance
+
+ * Reduce binned commits to time-indexed Map
+   ```
+   takes 160928ms
+   max mem 1.65G
+   Reduced 14287887 commits to 3320057 (23.24%) in 891 bins
+   ```
+ * Reduce binned commits to Set
+   ```
+   takes 148077ms
+   max mem 1.4G
+   Reduced 14287887 commits to 3320057 (23.24%)
+   ```
+ * Reduce binned commits to timeindexed SortedMap
+   ```
+   final mem 1.85
+   done in 169659ms
+   Reduced 14287887 commits to 3320057 (23.24%) in 891 bins
+   ```
+
 ## Build & Run
 
 ```sh

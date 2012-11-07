@@ -10,7 +10,7 @@ import JITEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Monoid._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
-import Timer._
+import perf.Timer._
 
 class GHRelationsViz(url: URL) {
   import GHRelationsViz._
@@ -39,13 +39,13 @@ class GHRelationsViz(url: URL) {
       .mapReduce[Map[User,Set[Project]]](groupProjectByUser)
       .values
       .flatMapReduce[Map[Link,Int]](projectsToLinks)
-      .filter( _._2 >= minDegree )
+      .filter( l => l._2 >= minDegree )
   
   def getJITData(from: Int, until: Int, minDegree: Int) = {
     val links =
       getProjectLinks(from, until, minDegree)
     val (involvedProjects,projectAdjacencyMap) = ( 
-      links.keySet
+      links.keySet.par
         .mapReduce[(Set[Project],Map[Project,Set[Project]])]
                   (linksToProjectsAndAdjacencyMap)
     )
@@ -91,6 +91,20 @@ object GHRelationsViz {
     try {
       val TReg(pId, pName, uId, uName, ts) = str
       Some(Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt))      
+    } catch {
+      case _ => None
+    }
+  }  
+
+  def parseStringToCommitFiltered(from: Int, to: Int, period: Int)(str: String) = {
+    try {
+      val TReg(pId, pName, uId, uName, ts) = str
+      val t = ts.toInt
+      val tt = t - (t % period)
+      if ( tt >= from && tt <= to )
+        Some(Commit(Project(pId.toInt,pName),User(uId.toInt,uName),tt))
+      else
+        None
     } catch {
       case _ => None
     }

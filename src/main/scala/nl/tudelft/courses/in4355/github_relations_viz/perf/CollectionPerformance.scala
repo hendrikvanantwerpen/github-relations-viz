@@ -1,4 +1,4 @@
-package nl.tudelft.courses.in4355.github_relations_viz
+package nl.tudelft.courses.in4355.github_relations_viz.perf
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit._

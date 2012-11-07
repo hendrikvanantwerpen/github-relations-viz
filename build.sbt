@@ -36,4 +36,10 @@ compile <<= (resourceDirectory in Compile, compile in Compile) map { (rd,result)
 
 fork in run := true
 
-//connectInput in run := true
+connectInput in run := true
+
+javaOptions ++= Seq(
+   "-Xms2000M",
+   "-Xmx4000M",
+   "-XX:+UseParallelGC"
+)

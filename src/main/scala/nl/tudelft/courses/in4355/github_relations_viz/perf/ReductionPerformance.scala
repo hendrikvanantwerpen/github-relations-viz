@@ -1,14 +1,17 @@
-package nl.tudelft.courses.in4355.github_relations_viz
+package nl.tudelft.courses.in4355.github_relations_viz.perf
 
 import java.net.URL
 import scala.collection._
 import scala.collection.immutable.SortedMap
+import nl.tudelft.courses.in4355.github_relations_viz.GHEntities._
+import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz
+
 import scalaz._
 import Scalaz._
-import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Monoid._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
+
 import Timer._
 
 object ReductionPerformance extends App {

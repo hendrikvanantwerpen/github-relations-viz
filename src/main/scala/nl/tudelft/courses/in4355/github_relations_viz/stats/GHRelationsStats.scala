@@ -24,13 +24,23 @@ case class Link(p1:Int,p2:Int) {
     }
   }
 
+class Logger(name: String) {
+  val logwriter = scalax.io.Resource.fromFile(name+".log").writer
+  def log(msg: Any) = { print(msg);trace(msg) }
+  def logln(msg: Any) = { println(msg);traceln(msg) }
+  def trace(msg: Any) = logwriter.write(msg.toString)
+  def traceln(msg: Any) = logwriter.write(msg.toString+"\n")
+}
+
 object GHRelationsStats extends App {
 
   val epoch_20100101 = 1262300400
+  val epoch_20100701 = 1277935200
   val epoch_20110101 = 1293836400
+  val epoch_20110701 = 1309471200
 
   val PERIOD    = 7 * 24 * 3600
-  val FROM      = epoch_20100101
+  val FROM      = epoch_20100701
   val TO        = epoch_20110101
   val MINDEGREE = 2
 
@@ -59,24 +69,6 @@ object GHRelationsStats extends App {
         Set.empty
       }
 
-  val logres = scalax.io.Resource.fromFile("testresults.txt").writer
-  def printlogln(a: Any) = {
-    println(a)
-    logln(a)
-  }
-  def log(a: Any) = logres.write(a.toString)
-  def logln(a: Any) = logres.write(a.toString+"\n")
-
-  def timed[A](msg: String)(f: => A): A = {
-    printlogln(msg+" ...")
-    val start = System.nanoTime()
-    val result: A = f
-    val end = System.nanoTime()
-    printlogln("done in "+((end-start)/1e6)+"ms")
-    result
-  }
-
-
   private val IntStringReg = """([^ ]+) ([^ ]+)""".r  
   def parseStringToIntString(str: String) = {
     try {
@@ -104,70 +96,149 @@ object GHRelationsStats extends App {
   def binCommitByPeriod(period: Int)(c: Commit) =
     c.copy(timestamp = c.timestamp - (c.timestamp % period))
 
-  // TEST
-
-  printlogln("Build project map")
-  val projects = timed("reading") {
-    getLines(projectsurl).flatMapReduce[Map[Int,String]]( parseStringToIntString )
-  }
-  printlogln("Found "+projects.size+" projects")
-
-  printlogln("Build user map")
-  val users = timed("reading") {
-    getLines(usersurl).flatMapReduce[Map[Int,String]]( parseStringToIntString )
-  }
-  printlogln("Found "+users.size+" users")
-
-  printlogln("Read commits")
-  val cs = timed("reducing") {
-    getLines(commitsurl).flatMap( parseStringToBinnedCommit )
+  def timed[A](msg: String, l: String => Unit)(f: => A): A = {
+    l(msg+" ...")
+    val start = System.nanoTime()
+    val result: A = f
+    val end = System.nanoTime()
+    val dt = end-start
+    if ( dt > 1e9 ) {
+      l("done in %.2fs".format(dt/1e9))
+    } else if ( dt > 1e6 ) {
+      l("done in %.2fms".format(dt/1e6))
+    } else {
+      l("done in %.2fus".format(dt/1e3))
+    }
+    result
   }
 
-  printlogln("Reduce commits to timeindexed Map")
-  val (total,bcm) = timed("reducing") {
-    cs.mapReduce[(Int,Map[Int,Set[(Commit,Int)]])]( c => {
-      val bc = getBinnedCommit(PERIOD)(c)
-      (1,(bc.timestamp,(bc,1)))
+  def test(name: String)(f: (TraversableOnce[String],TraversableOnce[String],TraversableOnce[String],Logger) => Unit) = {
+    val commitlines = getLines(commitsurl)
+    val projectlines = getLines(projectsurl)
+    val userlines = getLines(usersurl)
+    val logger = new Logger(name)
+    logger.logln("Starting test: "+name)
+    logger.logln("")
+    f(commitlines,projectlines,userlines,logger)
+  }
+
+  // TESTS
+
+  test("test 1") { (commitlines,projectlines,userlines,logger) =>
+
+    logger.logln("Build project map")
+    val projects = timed("reading",logger.logln) {
+      getLines(projectsurl).flatMapReduce[Map[Int,String]]( parseStringToIntString )
+    }
+    logger.logln("Found "+projects.size+" projects")
+
+    logger.logln("Build user map")
+    val users = timed("reading",logger.logln) {
+      getLines(usersurl).flatMapReduce[Map[Int,String]]( parseStringToIntString )
+    }
+    logger.logln("Found "+users.size+" users")
+
+    logger.logln("Read commits")
+    val cs = timed("reading",logger.logln) {
+      getLines(commitsurl).flatMap( parseStringToBinnedCommit )
+    }
+
+    logger.logln("Reduce commits to timeindexed Map")
+    val (total,bcm) = timed("reducing",logger.logln) {
+      cs.mapReduce[(Int,Map[Int,Set[Commit]])]( c => {
+        val bc = getBinnedCommit(PERIOD)(c)
+        (1,(bc.timestamp,bc))
+      } )
+    }
+    val n = (0 /: bcm)( _ + _._2.size )
+    val p = (n.toDouble/total.toDouble)*100.0
+    logger.logln("Reduced "+total+" commits to "+n+" ("+p+"%) in "+bcm.size+" bins")
+
+    val weekCommitHist = bcm.mapReduce[SortedMap[Int,Int]]( e => e._1 -> e._2.size )
+    logger.traceln("Commits per week")
+    weekCommitHist.foreach( logger.traceln )
+
+    val fcs = timed("filter time",logger.logln) {
+      bcm.filterKeys( k => k >= FROM && k <= TO ).values.flatten
+    }
+    logger.logln("Kept "+fcs.size+" commits after time filter")
+
+    val ups = timed("group projects by user",logger.logln) {
+      fcs.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
+    }
+
+    val upHist = ups.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
+    logger.traceln("Projects per users histogram")
+    upHist.foreach( logger.traceln )
+    val totalLinks = (0 /: upHist)( (t,e) => {
+        val n = e._1
+        val nl = ((n+1)*n)/2
+        t + (nl * e._2)
     } )
+    logger.logln("Total project links would be "+totalLinks)
+
+    val links = timed("calculating project links",logger.logln) {
+      ups.values
+         .flatMapReduce[Map[Link,Int]]( ps =>
+            createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) )
+    }
+    logger.logln("Total of "+links.size+" project links")
+
+    val linkHist = links.mapReduce[SortedMap[Int,Int]]( l => l._2 -> 1 )
+    logger.traceln("Link degree histogram")
+    linkHist.foreach( logger.traceln )
+
+    logger.logln("Done")
+
   }
-  val n = (0 /: bcm)( _ + _._2.size )
-  val p = (n.toDouble/total.toDouble)*100.0
-  printlogln("Reduced "+total+" commits to "+n+" ("+p+"%) in "+bcm.size+" bins")
+  test("test 2") { (commitlines,projectlines,userlines,logger) =>
 
-  val weekCommitHist = bcm.mapReduce[SortedMap[Int,Int]]( e => e._1 -> e._2.size )
-  logln("Commits per week")
-  weekCommitHist.foreach( logln )
+    logger.logln("Build project map")
+    val projects = timed("reading",logger.logln) {
+      getLines(projectsurl).flatMapReduce[Map[Int,String]]( parseStringToIntString )
+    }
+    logger.logln("Found "+projects.size+" projects")
 
-  val fcs = timed("filter time") {
-    bcm.filterKeys( k => k >= FROM && k <= TO ).values.flatten.map( _._1 )
+    logger.logln("Build user map")
+    val users = timed("reading",logger.logln) {
+      getLines(usersurl).flatMapReduce[Map[Int,String]]( parseStringToIntString )
+    }
+    logger.logln("Found "+users.size+" users")
+
+    logger.logln("Read commits")
+    val cs = timed("reducing",logger.logln) {
+      getLines(commitsurl).flatMap( parseStringToBinnedCommit )
+    }
+
+    logger.logln("Reduce commits to set")
+    val (total,bcs) = timed("reducing",logger.logln) {
+      cs.mapReduce[(Int,Set[Commit])]( c => {
+        val bc = getBinnedCommit(PERIOD)(c)
+        (1,bc)
+      } )
+    }
+    val n = bcs.size
+    val p = (n.toDouble/total.toDouble)*100.0
+    logger.logln("Reduced "+total+" commits to "+n)
+
+    val fcs = timed("filter time",logger.logln) {
+      bcs.filter( c => c.timestamp >= FROM && c.timestamp <= TO )
+    }
+    logger.logln("Kept "+fcs.size+" commits after time filter")
+
+    val ups = timed("group projects by user",logger.logln) {
+      fcs.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
+    }
+
+    val links = timed("calculating project links",logger.logln) {
+      ups.values
+         .flatMapReduce[Map[Link,Int]]( ps =>
+            createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) )
+    }
+    logger.logln("Total of "+links.size+" project links")
+
+    logger.logln("Done")
+
   }
-  printlogln("Kept "+fcs.size+" commits after time filter")
-
-  val ups = timed("group projects by user") {
-    fcs.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
-  }
-
-  val upHist = ups.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
-  logln("Projects per users histogram")
-  upHist.foreach( logln )
-  val totalLinks = (0 /: upHist)( (t,e) => {
-      val n = e._1
-      val nl = ((n+1)*n)/2
-      t + (nl * e._2)
-  } )
-  printlogln("Total project links would be "+totalLinks)
-
-  val links = timed("calculating project links") {
-    ups.values
-       .flatMapReduce[Map[Link,Int]]( ps =>
-          createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) )
-  }
-  printlogln("Total of "+links.size+" project links")
-
-  val linkHist = links.mapReduce[SortedMap[Int,Int]]( l => l._2 -> 1 )
-  logln("Link degree histogram")
-  linkHist.foreach( logln )
-
-  printlogln("Done")
 
 }
