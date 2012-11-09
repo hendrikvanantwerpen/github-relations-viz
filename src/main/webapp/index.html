@@ -2,20 +2,21 @@
   <head>
     <title>Github Project Relations Viz</title>
     <link rel="stylesheet" href="jquery-ui.css" />
-    <script language="javascript" type="text/javascript" src="jit.js"></script>
     <script language="javascript" type="text/javascript" src="jquery.js"></script>
     <script language="javascript" type="text/javascript" src="jquery-ui.js"></script>
-    <script language="javascript" type="text/javascript" src="main.js"></script>
+    <script language="javascript" type="text/javascript" src="d3.v2.js"></script>
+    <script type="text/javascript" src="main.js"></script>
   </head>
   <body>
-    <div id="graphanchor" style="margin:auto;width:50%;height:50%;background-color: #eeeeee;"></div>
+    <div id="graphanchor"></div>
     <p>&nbsp;</p>
-    <div><span>Date range: </span><span id="date-range"></span></div>
+    <div><span>From: </span><span id="date-from"></span></div>
+    <div><span>To: </span><span id="date-to"></span></div>
     <br />
     <div id="date-range-slider"></div>
     <br />
-     <div><span>Degree: </span><span id="degree"></span></div>
-     <br />
+    <div><span>Degree: </span><span id="degree"></span></div>
+    <br />
     <div id="degree-range-slider"></div>
     <br />
     <div id="statusdiv"><span id="labelID">Status: </span><span id="statusLabel">ready</span></div>

@@ -6,10 +6,7 @@ import scala.io.Source
 import scala.util.matching.Regex
 import D3Entities._
 import GHEntities._
-import JITEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
-import net.van_antwerpen.scala.collection.mapreduce.CollectionAggregators._
-import net.van_antwerpen.scala.collection.mapreduce.ValueAggregators._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 
 class GHRelationsViz(url: URL) {
@@ -38,34 +35,15 @@ class GHRelationsViz(url: URL) {
       .filter( c => isCommitInRange(c, from, until) )
       .mapReduce[Map[User,Set[Project]]](groupProjectByUser)
       .values
-      .flatMapReduce[Map[Link,Int]](projectsToLinks)
+      .mapReduce[Map[Link,Int]](projectsToLinks)
       .filter( _._2 >= minDegree )
-  
-  def getJITData(from: Int, until: Int, minDegree: Int) = {
-    val links =
-      getProjectLinks(from, until, minDegree)
-    val (involvedProjects,projectAdjacencyMap) = ( 
-      links.keySet
-        .mapReduce[(Set[Project],Map[Project,Set[Project]])]
-                  (linksToProjectsAndAdjacencyMap)
-    )
-    val projectAndOptAdjecancyMap = (
-      involvedProjects
-        .mapReduce[Map[Project,Set[Project]]]
-                  (zipWithOption(projectAdjacencyMap))
-    )
-    val graphNodes = 
-      projectAndOptAdjecancyMap
-        .mapReduce[Set[JITNode]](projectWithAdjacanciesToJITNode)
-    graphNodes
-  }
-  
+    
   def getD3Data(from: Int, until: Int, minDegree: Int) = {
     val links = 
       getProjectLinks(from, until, minDegree)
     val involvedProjects =
       links.keySet
-        .flatMapReduce[Set[Project]](linksToProjects)
+        .mapReduce[Set[Project]](linksToProjects)
         .toList
     val d3nodes =
       involvedProjects
@@ -135,13 +113,6 @@ object GHRelationsViz {
   
   def zipWithOption[A,B](lookup: Map[A,B])(a: A) =
     (a -> lookup.get(a))
-
-  def projectWithAdjacanciesToJITNode(pl: (Project,Set[Project])) = 
-    JITNode(
-      pl._1.id.toString,
-      pl._1.name,
-      pl._2.map( _.id.toString )
-    )
 
   def linksToProjects(l: Link) =
     Set(l.p1,l.p2)

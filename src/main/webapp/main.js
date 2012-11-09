@@ -1,121 +1,125 @@
 $(document).ready(function(){
 
-  $.ajaxSetup({
-      cache: false
-  });
+    $.ajaxSetup({
+        cache: false
+    });
 
-  var labelType, useGradients, nativeTextSupport, animate;
+    var minTime = maxTime = 0
+    var degree = 1
 
-  var minTime = maxTime = 0
-  var degree = 1
-
-  var ua = navigator.userAgent,
-      iStuff = ua.match(/iPhone/i) || ua.match(/iPad/i),
-      typeOfCanvas = typeof HTMLCanvasElement,
-      nativeCanvasSupport = (typeOfCanvas == 'object' || typeOfCanvas == 'function'),
-      textSupport = nativeCanvasSupport 
-        && (typeof document.createElement('canvas').getContext('2d').fillText == 'function');
-  //I'm setting this based on the fact that ExCanvas provides text support for IE
-  //and that as of today iPhone/iPad current text support is lame
-  labelType = (!nativeCanvasSupport || (textSupport && !iStuff))? 'Native' : 'HTML';
-  nativeTextSupport = labelType == 'Native';
-  useGradients = nativeCanvasSupport;
-  animate = !(iStuff || !nativeCanvasSupport);
-
-  // init ForceDirected
-  var fd = new $jit.ForceDirected({
-    //id of the visualization container
-    injectInto: 'graphanchor',
-    //Enable zooming and panning
-    //by scrolling and DnD
-    Navigation: {
-      enable: true,
-      //Enable panning events only if we're dragging the empty
-      //canvas (and not a node).
-      panning: 'avoid nodes',
-      zooming: 10 //zoom speed. higher is more sensible
-    },
-    // Change node and edge styles such as
-    // color and width.
-    // These properties are also set per node
-    // with dollar prefixed data-properties in the
-    // JSON structure.
-    Node: {
-      overridable: true
-    },
-    Edge: {
-      overridable: true,
-      color: '#23A4FF',
-      lineWidth: 0.4
-    },
-    //Native canvas text styling
-    Label: {
-      type: labelType, //Native or HTML
-      size: 4,
-      color: 'black',
-      style: 'bold'
-    },
-    //Add Tips
-    Tips: {
-      enable: true,
-      onShow: function(tip, node) {
-        //count connections
-        var count = 0;
-        node.eachAdjacency(function() { count++; });
-        //display node info in tooltip
-        tip.innerHTML = "<div class=\"tip-title\">" + node.name + "</div>"
-          + "<div class=\"tip-text\"><b>connections:</b> " + count + "</div>";
-      }
-    },
-    // Add node events
-    Events: {
-      enable: true,
-      type: 'Native',
-      //Change cursor style when hovering a node
-      onMouseEnter: function() {
-        fd.canvas.getElement().style.cursor = 'move';
-      },
-      onMouseLeave: function() {
-        fd.canvas.getElement().style.cursor = '';
-      },
-      //Add also a click handler to nodes
-      onClick: function(node) {
-        if(!node) return;
-        // Build the right column relations list.
-        // This is done by traversing the clicked node connections.
-        var html = "<h4>" + node.name + "</h4><b> connections:</b><ul><li>",
-            list = [];
-        node.eachAdjacency(function(adj){
-          list.push(adj.nodeTo.name);
-        });
-        //append connections information
-        $jit.id('inner-details').innerHTML = html + list.join("</li><li>") + "</li></ul>";
-      }
-    },
-    //Number of iterations for the FD algorithm
-    iterations: 10,
-    //Edge length
-    levelDistance: 130,
-    // Add text to the labels. This method is only triggered
-    // on label creation and only for DOM labels (not native canvas ones).
-    onCreateLabel: function(domElement, node){
-      domElement.innerHTML = node.name;
-      var style = domElement.style;
-      style.fontSize = "0.8em";
-      style.color = "#ddd";
-    },
-    // Change node styles when DOM labels are placed
-    // or moved.
-    onPlaceLabel: function(domElement, node){
-      var style = domElement.style;
-      var left = parseInt(style.left);
-      var top = parseInt(style.top);
-      var w = domElement.offsetWidth;
-      style.left = (left - w / 2) + 'px';
-      style.top = (top + 10) + 'px';
-      style.display = '';
+    function createGraph() {
     }
-  });
+
+    function updateGraph(nodes,links) {
+        // rather crude way to reset the graph for now, updating is nicer
+        $( "#graphanchor" ).html( "" )
+
+        var w = 960, h = 500;
+
+        var vis = d3.select("#graphanchor").append("svg:svg").attr("width", w).attr("height", h);
+
+        var labelAnchors = [];
+        var labelAnchorLinks = [];
+
+        for(var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            labelAnchors.push({
+                node : node
+            });
+            labelAnchors.push({
+                node : node
+            });
+            labelAnchorLinks.push({
+                source : i * 2,
+                target : i * 2 + 1,
+                weight : 1
+            });
+        };
+
+        var force = d3.layout.force()
+                      .size([w, h])
+                      .nodes(nodes)
+                      .links(links)
+                      .gravity(1)
+                      //.linkDistance(50)
+                      .linkDistance(function(l,i){ return 200/(l.value*l.value); })
+                      .charge(-1000)
+                      .linkStrength(10);
+                      //.linkStrength(function(x) { return x.value * 10; });
+
+        force.start();
+
+        var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(0).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
+        force2.start();
+
+        var link = vis.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "#CCC");
+
+        var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
+        node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);
+        node.call(force.drag);
+
+        var anchorLink = vis.selectAll("line.anchorLink").data(labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
+
+        var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
+        anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
+            anchorNode.append("svg:text").text(function(d, i) {
+            return i % 2 != 0 ? d.node.name : ""
+        }).style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
+
+        var updateLink = function() {
+            this.attr("x1", function(d) {
+                return d.source.x;
+            }).attr("y1", function(d) {
+                return d.source.y;
+            }).attr("x2", function(d) {
+                return d.target.x;
+            }).attr("y2", function(d) {
+                return d.target.y;
+            });
+
+        }
+
+        var updateNode = function() {
+            this.attr("transform", function(d) {
+                return "translate(" + d.x + "," + d.y + ")";
+            });
+
+        }
+
+
+        force.on("tick", function() {
+
+            force2.start();
+
+            node.call(updateNode);
+
+            anchorNode.each(function(d, i) {
+                if(i % 2 == 0) {
+                    d.x = d.node.x;
+                    d.y = d.node.y;
+                } else {
+                    var b = this.childNodes[1].getBBox();
+
+                    var diffX = d.x - d.node.x;
+                    var diffY = d.y - d.node.y;
+
+                    var dist = Math.sqrt(diffX * diffX + diffY * diffY);
+
+                    var shiftX = b.width * (diffX - dist) / (dist * 2);
+                    shiftX = Math.max(-b.width, Math.min(0, shiftX));
+                    var shiftY = 5;
+                    this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
+                }
+            });
+
+
+            anchorNode.call(updateNode);
+
+            link.call(updateLink);
+            anchorLink.call(updateLink);
+
+        });
+    }
 
   function createUI(minDate,maxDate) {
     $( "#date-range-slider" ).slider({
@@ -148,65 +152,50 @@ $(document).ready(function(){
     });
   }
 
-  function fmtEpoch(e) {
-      return new Date(1000*e).toString();
-  }
   
   function updateUI() {
-      $( "#date-range" ).text( fmtEpoch(minTime)+" - "+fmtEpoch(maxTime));
+      function fmtEpoch(e) {
+          return new Date(1000*e).toString();
+      }
+      $( "#date-from" ).text( fmtEpoch(minTime) );
+      $( "#date-to" ).text( fmtEpoch(maxTime) );
       $('#degree').text( degree );
+  }
+
+  function updateStatus(msg) {
+      $("#statusLabel").text(msg);
   }
 
   var request = null;
   function refreshGraph() {
       if(request !== null) {
-          request.abort();
-          request = null;
-          refreshGraph();
+          updateStatus("try again later - request in progress");
       } else {
-        $("#statusLabel").text('loading...');
-        request = $.getJSON('/jitdata?from='+minTime+'&to='+maxTime+'&degree='+degree)
+        updateStatus('loading...');
+        request = $.getJSON('/d3data?from='+minTime+'&to='+maxTime+'&degree='+degree)
         .success(function(json){
-          if ( json.length > 0 ) {
-            $("#statusLabel").text('loading json into graph');
-            // load JSON data.
-            fd.loadJSON(json);
-            // compute positions incrementally and animate.
-            fd.computeIncremental({
-              iter: 200,
-              property: 'end',
-              onStep: function(perc){
-                $("#statusLabel").text(perc+'% loaded...');
-              },
-              onComplete: function(){
-                $("#statusLabel").text('animating graph');
-                fd.animate({
-                  modes: ['linear'],
-                  transition: $jit.Trans.Elastic.easeOut,
-                  duration: 2500
-                });
-                request = null;
-                $("#statusLabel").text('graph rendered - ready');
-              }
-            });
+          request = null;
+          if ( !$.isEmptyObject(json) ) {
+            updateStatus('loading json into graph');
+            updateGraph(json.nodes,json.links);
+            updateStatus('graph rendered - ready');
           } else {
-            request = null;
-            $("#statusLabel").text('empty graph - ready');
+            updateStatus('empty graph - ready');
           }
         })
         .error(function(){
-         $("#statusLabel").text('error');
+         updateStatus('error');
          request = null;
        });
      }
   }
 
-  $("#statusLabel").text('getting date range');
+  updateStatus('getting date range');
   $.getJSON('/range')
   .success(function(range){
     minTime = maxTime = range.min
     createUI(range.min,range.max);
-    $("#statusLabel").text('ready');
+    updateStatus('ready');
   });
 
 });

@@ -5,8 +5,6 @@ import java.net.URL
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities._
 import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
-import net.van_antwerpen.scala.collection.mapreduce.CollectionAggregators._
-import net.van_antwerpen.scala.collection.mapreduce.ValueAggregators._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 
 class GHObtainLinks(url: URL, divisor: Int, remainder: Int) {
