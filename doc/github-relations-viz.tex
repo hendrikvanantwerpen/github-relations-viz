@@ -22,14 +22,13 @@
   morestring=[b]"""
 }
 \lstset{
-  frame=tb,
+  %frame=tb,
   language=scala,
-  aboveskip=3mm,
-  belowskip=3mm,
+  %aboveskip=3mm,
+  %belowskip=3mm,
   showstringspaces=false,
   numbers=left,
   breaklines=false,
-  title=\lstname,
   columns=flexible,
   captionpos=t,
   basicstyle={\small\ttfamily}
@@ -41,7 +40,7 @@
   \and
     Niels van Kaam\thanks{\href{mailto:N.vanKaam@student.tudelft.nl}{\nolinkurl{N.vanKaam@student.tudelft.nl}}}
 }
-\date{draft}
+\date{Software Engineering Research Group, EECMS\\Delft University of Technology}
 
 \begin{document}
 
@@ -50,19 +49,6 @@
 \begin{abstract}
 GitHub has emerged as an interesting object of study for software repository analysis because of its open API. Visualizing this data can be challenging, both because of the lack of knowledge about its structure and because of the size of the dataset. In this report we describe a web based system that makes it possible to explore one such relation, the links between projects based on common committers. Users can explore the data by selecting time limits, link degrees and project language. The project was developed in the context of a course in functional programming with extra focus on distributed data processing and the report describes the functional and distributed techniques used to build the data processing.
 \end{abstract}
-
-\begin{lstlisting}[label=lst:sample,caption=Sample code]
-val x: Int = 1
-trait SomeTrait extends SomeOtherTrait {
-  def f(a: String, b: List[String]) = println(a)
-}
-\end{lstlisting}
-
-\begin{lstlisting}[language=haskell,caption=Haskell code]
-f :: Monad a => a -> Int
-\end{lstlisting}
-
-As seen in listing \ref{lst:sample}.
 
 \section{Introduction}
 
@@ -77,7 +63,7 @@ We identify several challenges in the design of the software:
     \item Ensuring responsiveness of the software, so exploring the data is easy and practical.
 \end{itemize}
 
-The software was developed in the context of a functional programming course\footnote{\url{http://swerl.tudelft.nl/bin/view/Main/FunctionalProgrammingCourse}} at the Delft University of Technology. The course focused on functional programming techniques, application of these techniques in more imperative languages and using them for processing large data sets. The report therefore also describes how the functional programming and data processing techniques from the course were applied.
+The software was developed in the context of a functional programming course\footnote{\url{http://swerl.tudelft.nl/bin/view/Main/FunctionalProgrammingCourse}} at the Delft University of Technology. The course focused on functional programming techniques, application of these techniques in more imperative languages and using them for processing large data sets. The report therefore also describes how the functional programming and data processing techniques from the course were applied. The project was implemented using Scala and the code samples will be mostly in that language.
 
 We describe the following aspects of the software:
 \begin{itemize}
@@ -90,22 +76,103 @@ We describe the following aspects of the software:
 
 \section{GitHub data analysis}\label{sec:data}
 
-\begin{itemize}
-    \item What data did we have
-    \item Some statistics about the data
-    \item What where the processing steps we took
-\end{itemize}
+The data we could use was a list of all projects with their main programming language, a list of all users and a list of commits. Every commit links a user to a project at some time.
 
-\section{MapReduce on Scala Collections}\label{sec:mapreduce}
+% some data statistics?
 
+We allow the user to vary the following parameters:
 \begin{itemize}
-    \item Where did the idea come from, what did we want to address.
-    \item How was it implemented in Scala
-    \item What design choices where made in the implementation
-    \item How is the code compared to hand-written?
-    \item How is performance compared to hand-written code?
-    \item Some code samples (maybe Haskell equivalents for explanation?)
+    \item Project language (limits projects within one ecosystem)
+    \item Time period in which the links are counted
+    \item Minimum link degree
 \end{itemize}
+The desired end result is a list of links between projects, a weight on each link of the amount of common committers and a weight on each project of the amount of connected projects. This last property can identify central projects in the graph.
+
+Processing data can be elegantly expressed as a stream of filter and transform operations. For our purpose they are:
+\begin{enumerate}
+    \item filter projects for selected language
+    \item filter commits and exclude commits outside of the selected time period or not in the filtered project list
+    \item create a set of projects per user
+    \item per user, create links between all those projects
+    \item merge all project links, assigning them weight based on their occurrence
+    \item transform the list of links to a format understood by the visualization code
+\end{enumerate}
+
+\section{MapReduce with Scala collections}\label{sec:mapreduce}
+
+An increasingly popular approach for processing big data sets is using a form of MapReduce. This lends itself very well for distribution of the data processing. One incarnation of MapReduce is found in Google's Sawzall DSL, using a form of aggregators. A rigorous specification of this model is given in \cite{lammel2008google}. This describes the Sawzall model formally using monoids, that can be hierarchically composed for distribution of the workload. Because monoids for common data types like lists, maps and tuples are readily available, developers don't need to focus much on the reduce phase and can focus on the map phase. Because Sawzall also allows map functions to output one element of a collection to be appended, L\"ammel defines aggregators in terms of generalized monoids:
+\begin{lstlisting}[language=haskell]
+class Monoid m => Aggregator e m | e -> m
+  where
+    minsert :: e -> m -> m
+\end{lstlisting}
+
+\subsection{Aggregators}
+
+Since to our knowledge no implementation of this approach was available in Scala, we set out to implement it ourselves. Although L\"ammel defines aggregators as a subtype of monoids, we use the aggregator as the only type. A monoid becomes an aggregator where e and m are of the same type. Why this is useful will become clear later. For now, the base trait is:
+\begin{lstlisting}
+trait Aggregator[A,B] {
+  def zero: A
+  def insert(a: A, b: B): A
+}
+\end{lstlisting}
+
+Using Scala implicits we have defined \lstinline!a |<| b! as the Aggregator insert operator. Whenever this operator is used, a fitting Aggregator is inferred. All Scala \lstinline|implicit| rules apply, so if no Aggregator is found there's compile error, if multiple are found the programmer has to specify which one to use.
+
+Assuming we have an appending aggregator for \lstinline|List| and a summing one for \lstinline|Int|, we can do things like the following:
+\begin{lstlisting}
+val r:Int = i:Int |<| j:Int // sum ints
+val r:List[Int] = l:List[Int] |<| m:List[Int] // concat lists
+val r:List[Int] = l:List[Int] |<| i:Int // append int element to list
+\end{lstlisting}
+
+Because of the emphasize on generics in the Scala collections library (see \citep{odersky2009fighting} for more details), we were able to provide aggregators for all Scala collections (including parallel ones) by implementing only seven aggregators. For \lstinline|Set|, \lstinline|Seq| and \lstinline|Map| each one aggregator for monoid behaviour and one for element insertion. Because of the design of the collections library, every collection is a Traversable of it's element type, so the monoidal aggregators can be liberal in their input, which allows things like:
+\begin{lstlisting}
+val r:List[Int] = l:List[Int] |<| s:Set[Int]
+val r:TreeMap[Int,Int] = tm:TreeMap[Int,Int] |<| sm:SortedMap[Int,Int]
+//val r:Map[Int,Int] = m:Map[Int,Int] |<| l:List[(Int,Int)] // doesn't work?
+\end{lstlisting}
+The last example is something that is expected to work (\lstinline|Map[K,V] <: Traversable[(K,V)]|, but is somehow not inferred by the compiler. Discussions online suggest that the compiler doesn't consider the complete type hierarchy when inferring, but only a few levels. To also allow this construction the seventh aggregator was implemented.
+
+A nice property of monoids is that they can be combined. E.g. a tuple with two monoid values is itself a monoid. Let's see how this property manifests itself in our aggregator world. Aggregators for \lstinline|TupleN| and \lstinline|Map| where implemented to require their tuple values and map value to be aggregators themselves. Here is where the choice to abandon a seperate monoid type for a aggregator pays of. When creating deep structures of values, on every level we have the choice to insert either a value or a collection. Some examples should make this more clear:
+\begin{lstlisting}
+// inserted tuples contain collections or elements. values are independent
+val r:(Set[Int],Set[String]) = t1:(Set[Int],Set[String]) |<| t2:(Set[Int],Set[String])
+val r:(Set[Int],Set[String]) = t1:(Set[Int],Set[String]) |<| t2:(Int,String)
+val r:(Set[Int],Set[String]) = t1:(Set[Int],Set[String]) |<| t2:(Set[Int],String)
+
+// three level deep structures
+val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| Map[Int,Set[String]]
+val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| Map[Int,String]
+val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| (Int,Set[String])
+val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| (Int,String)
+\end{lstlisting}
+
+Our design allows a lot of freedom in the shape of the elements inserted into a collection. Which constructs are allowed is dictated by the defined aggregators and fully inferred by the compiler. The options for the Scala collections are very generic and the developer doesn't have to care about merging the collections. For opaque values aggregators are implemented for string concatenation and integer summing, but others are very easy to implement; one implicit function and an implementation of the two Aggregator functions is enough.
+
+\subsection{MapReduce}
+
+Using the aggregators we now have, a map-reduce library was implemented. Ideally the map-reduce functionality was as easy to use as the standard collection functions, like \lstinline|map|, \lstinline|filter| and \lstinline|partition|. To a high degree this can be achieved by Pimp-my-library pattern, described in \citep{odersky2006pimp}. Again the design of the collections library plus type inference allow us to write map-reduce by only specifying the expected result type. This and the return type of the map function is enough to find the necessary aggregator. A word count example similar to one L\"ammel gives is:
+\begin{lstlisting}
+val docs: List[String]
+def wordcount(doc: String): List[(String,Int)] = doc.split(" ").toList.map( w => (w,1) )
+val wc = docs.mapReduce[Map[String,Int]]( wordcount )
+// wc has type Map[String,Int] here
+\end{lstlisting}
+
+The performance of our map-reduce in the same order and range as hand written code using e.g. \lstinline|foldLeft|. Most of the work is done through inference by the compiler. At runtime the aggregators use folds and collection operations just as you would in handwritten code. There a little overhead of some function calls, but all the reduction details are abstracted away, resulting in less repetition and simpler data transformation functions.
+
+With this result we can write our processing steps from section \ref{sec:data} in Scala. You can see they mix seamless with the existing collection library functions.
+\begin{lstlisting}
+val commits: List[Commit] = ...
+def projectsToPairs(ps: List[Project]): List[(Project,Project)] = ...
+val linkMap = 
+  commits.filter( c => c.timestamp >= from && c.timestamp <= until  )
+         .mapReduce[Map[User,Set[Project]]]( c => (c.user,c.project) )
+         .values
+         .mapReduce[Map[(Project,Project),Int]](projectsToParis)
+         .filter( _._2 >= minDegree )
+\end{lstlisting}
 
 \section{Distributed data-processing with Akka}\label{sec:distributed}
 
