@@ -1,0 +1,110 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[english]{babel}
+\renewcommand*\ttdefault{txtt}
+\usepackage[T1]{fontenc}
+
+\usepackage{listings}
+\lstdefinelanguage{scala}{
+  morekeywords={abstract,case,catch,class,def,do,else,extends,false,
+                final,finally,for,if,implicit,import,match,mixin,new,
+                null,object,override,package,private,protected,
+                requires,return,sealed,super,this,trait,true,try,
+                type,val,var,while,with,yield},
+  otherkeywords={=,=>,<-,<\%,<:,>:,\#,@},  
+  sensitive=true,  
+  morecomment=[l]//,
+  morecomment=[n]{/*}{*/}, %or [s]
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[b]"""
+}
+\lstset{
+  frame=tb,
+  language=scala,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  numbers=left,
+  breaklines=false,
+  title=\lstname,
+  columns=flexible,
+  captionpos=t,
+  basicstyle={\small\ttfamily}
+}
+
+%\usepackage{minted}
+
+\title{Visualizing Project Relations on GitHub}
+\author{Hendrik van Antwerpen \and Niels van Kaam}
+\date{draft}
+
+\begin{document}
+
+\maketitle
+
+\begin{lstlisting}[label=lst:sample,caption=Sample code]
+val x: Int = 1
+trait SomeTrait extends SomeOtherTrait {
+  def f(a: String, b: List[String]) = println(a)
+}
+\end{lstlisting}
+
+As seen in listing \ref{lst:sample}.
+
+\section{Introduction}
+
+\begin{itemize}
+    \item Context of the project
+    \item What is intersting about GitHub
+    \item What is the challenge
+    \item Introduce what we did
+\end{itemize}
+
+\section{GitHub data analysis}
+
+\begin{itemize}
+    \item What data did we have
+    \item Some statistics about the data
+    \item What where the processing steps we took
+\end{itemize}
+
+\section{MapReduce on Scala Collections}
+
+\begin{itemize}
+    \item Where did the idea come from, what did we want to address
+    \item How was it implemented in Scala
+    \item What design choices where made in the implementation
+    \item How is the code compared to hand-written?
+    \item How is performance compared to hand-written code?
+    \item Some code samples (maybe Haskell equivalents for explanation?)
+\end{itemize}
+
+\section{Distributed data-processing with Akka}
+
+\begin{itemize}
+    \item What did we want to address
+    \item How did we design the actors, where was the caching, where which processing steps
+    \item What was the performance (did we speed up response time?)
+    \item A design diagram
+\end{itemize}
+
+\section{Visualization in the browser with D3}
+
+\begin{itemize}
+    \item What did we want to show?
+    \item How did we implement it (D3, what graph parameters)
+    \item How did we emphasize characteristics (e.g. central projects)
+    \item An example result
+\end{itemize}
+
+\section{Conclusions and further research}
+
+\begin{itemize}
+    \item Did it work
+    \item Is it responsive?
+    \item Did we show interesting things
+    \item What more interesting things could fit in this framework?
+\end{itemize}
+
+\end{document}
