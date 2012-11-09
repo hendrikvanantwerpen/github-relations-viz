@@ -3,6 +3,8 @@
 \usepackage[english]{babel}
 \renewcommand*\ttdefault{txtt}
 \usepackage[T1]{fontenc}
+\usepackage[round,authoryear]{natbib}
+\usepackage[hidelinks]{hyperref}
 
 \usepackage{listings}
 \lstdefinelanguage{scala}{
@@ -11,7 +13,7 @@
                 null,object,override,package,private,protected,
                 requires,return,sealed,super,this,trait,true,try,
                 type,val,var,while,with,yield},
-  otherkeywords={=,=>,<-,<\%,<:,>:,\#,@},  
+  otherkeywords={=,=>,<-,<\%,<:,>:,\#,@},
   sensitive=true,  
   morecomment=[l]//,
   morecomment=[n]{/*}{*/}, %or [s]
@@ -33,15 +35,21 @@
   basicstyle={\small\ttfamily}
 }
 
-%\usepackage{minted}
-
 \title{Visualizing Project Relations on GitHub}
-\author{Hendrik van Antwerpen \and Niels van Kaam}
+\author{
+    Hendrik van Antwerpen\thanks{\href{mailto:H.vanAntwerpen@student.tudelft.nl}{\nolinkurl{H.vanAntwerpen@student.tudelft.nl}}}
+  \and
+    Niels van Kaam\thanks{\href{mailto:N.vanKaam@student.tudelft.nl}{\nolinkurl{N.vanKaam@student.tudelft.nl}}}
+}
 \date{draft}
 
 \begin{document}
 
 \maketitle
+
+\begin{abstract}
+GitHub has emerged as an interesting object of study for software repository analysis because of its open API. Visualizing this data can be challenging, both because of the lack of knowledge about its structure and because of the size of the dataset. In this report we describe a web based system that makes it possible to explore one such relation, the links between projects based on common committers. Users can explore the data by selecting time limits, link degrees and project language. The project was developed in the context of a course in functional programming with extra focus on distributed data processing and the report describes the functional and distributed techniques used to build the data processing.
+\end{abstract}
 
 \begin{lstlisting}[label=lst:sample,caption=Sample code]
 val x: Int = 1
@@ -50,18 +58,37 @@ trait SomeTrait extends SomeOtherTrait {
 }
 \end{lstlisting}
 
+\begin{lstlisting}[language=haskell,caption=Haskell code]
+f :: Monad a => a -> Int
+\end{lstlisting}
+
 As seen in listing \ref{lst:sample}.
 
 \section{Introduction}
 
+In the field of software repository mining, GitHub has emerged as an interesting subject of study and tools have emerged to collect and publish the data it publishes \citep{gousios2012ghtorrent}. Making sense of the data and visualizing it in interesting ways is not trivial. An interactive interface to explore relations in the data set, allowing a researcher to play with parameters like project language or time period, can be a good entry point to further investigation of the data using formal statistic methods.
+
+In this report we present a web based software system that allows a user to explore relations between projects on GitHub. Projects have a relation when a common committer exists. The user can influence the time period where the link must exists, the main programming language of the project and the minimum degree that is included in the results.
+
+We identify several challenges in the design of the software:
 \begin{itemize}
-    \item Context of the project
-    \item What is intersting about GitHub
-    \item What is the challenge
-    \item Introduce what we did
+    \item Providing a general visualization that might reveal interesting properties of the data to the user.
+    \item Dealing with the large size of the data that is being processed.
+    \item Ensuring responsiveness of the software, so exploring the data is easy and practical.
 \end{itemize}
 
-\section{GitHub data analysis}
+The software was developed in the context of a functional programming course\footnote{\url{http://swerl.tudelft.nl/bin/view/Main/FunctionalProgrammingCourse}} at the Delft University of Technology. The course focused on functional programming techniques, application of these techniques in more imperative languages and using them for processing large data sets. The report therefore also describes how the functional programming and data processing techniques from the course were applied.
+
+We describe the following aspects of the software:
+\begin{itemize}
+    \item A description of the data and the data processing (section \ref{sec:data}).
+    \item A description of a MapReduce implementation in Scala, created to implement the data processing (section \ref{sec:mapreduce}).
+    \item A description of the distributed design of the backend, created to improve responsiveness of the software (section \ref{sec:distributed}).
+    \item A description of the visualization used in the software (section \ref{sec:visualization}).
+    \item Conclusions and ideas for further research and development (section \ref{sec:conclusions}).
+\end{itemize}
+
+\section{GitHub data analysis}\label{sec:data}
 
 \begin{itemize}
     \item What data did we have
@@ -69,10 +96,10 @@ As seen in listing \ref{lst:sample}.
     \item What where the processing steps we took
 \end{itemize}
 
-\section{MapReduce on Scala Collections}
+\section{MapReduce on Scala Collections}\label{sec:mapreduce}
 
 \begin{itemize}
-    \item Where did the idea come from, what did we want to address
+    \item Where did the idea come from, what did we want to address.
     \item How was it implemented in Scala
     \item What design choices where made in the implementation
     \item How is the code compared to hand-written?
@@ -80,7 +107,7 @@ As seen in listing \ref{lst:sample}.
     \item Some code samples (maybe Haskell equivalents for explanation?)
 \end{itemize}
 
-\section{Distributed data-processing with Akka}
+\section{Distributed data-processing with Akka}\label{sec:distributed}
 
 \begin{itemize}
     \item What did we want to address
@@ -89,7 +116,7 @@ As seen in listing \ref{lst:sample}.
     \item A design diagram
 \end{itemize}
 
-\section{Visualization in the browser with D3}
+\section{Visualization in the browser with D3}\label{sec:visualization}
 
 \begin{itemize}
     \item What did we want to show?
@@ -98,7 +125,7 @@ As seen in listing \ref{lst:sample}.
     \item An example result
 \end{itemize}
 
-\section{Conclusions and further research}
+\section{Conclusions and further research}\label{sec:conclusions}
 
 \begin{itemize}
     \item Did it work
@@ -106,5 +133,10 @@ As seen in listing \ref{lst:sample}.
     \item Did we show interesting things
     \item What more interesting things could fit in this framework?
 \end{itemize}
+
+We believe the given approach can be easily adapted to include other parameters or show other relations in the data.
+
+\bibliographystyle{abbrvnat}
+\bibliography{github-relations-viz}
 
 \end{document}
