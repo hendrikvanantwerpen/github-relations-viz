@@ -3,13 +3,11 @@ package nl.tudelft.courses.in4355.github_relations_viz
 object GHEntities {
 
   case class Range(min:Int,max:Int)
-  case class User(id:Int,name:String)
-  case class Project(id:Int,name:String)
-  case class Commit(project:Project,user:User,timestamp:Int)
-  case class Link(p1:Project,p2:Project) {
+  case class Commit(projectId:Int,userId:Int,timestamp:Int)
+  case class Link(pId1:Int,pId2:Int) {
     def normalize = {
-      if ( p2.id < p1.id ) {
-        Link(p2,p1)
+      if ( pId2 < pId1 ) {
+        Link(pId2,pId1)
       } else {
         this
       }

@@ -8,49 +8,67 @@ import D3Entities._
 import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
+import Logger._
 
-class GHRelationsViz(url: URL) {
+class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: Int) {
   import GHRelationsViz._
 
-  val PERIOD = 7 * 24 * 3600
+  println( "Reading projects" )
+  val projects =
+    getLines(projectsurl)
+      .flatMapReduce[Map[Int,String]]( parseStringToIntString )
   
+  println( "Reading users" )
+  val users =
+    getLines(usersurl)
+      .flatMapReduce[Map[Int,String]]( parseStringToIntString ).toList
+    
+  println( "Reading commits" )
   val commits =
-    readCommitsFromURL(url)
-      .mapReduce[Set[Commit]](binCommitByPeriod(PERIOD))
+    getLines(commitsurl).flatMapReduce[Map[Int,Set[Commit]]] { l => 
+      val c = parseStringToBinnedCommit(period)(l)
+      c.filter( _.timestamp != 0 ).map( c => (c.timestamp,c) )
+    }
 
-  /*val limits = timed("calculate limits") { Range(
-      (Int.MaxValue /: commits)( (a,c) => math.min(a,c.timestamp) ),
-      (Int.MinValue /: commits)( (a,c) => math.max(a,c.timestamp) )
-  ) }*/
+  println( "Calculating limits" )
+  val limits = Range(
+      (Int.MaxValue /: commits.keySet)( (a,ts) => math.min(a,ts) ),
+      (Int.MinValue /: commits.keySet)( (a,ts) => math.max(a,ts) )
+  )
   
   val epoch2000_01_01 = 946684800
-  def getLimits = 
-    Range(
-      (new Date(epoch2000_01_01).getTime()/1000).toInt,
-      (new Date().getTime()/1000).toInt
-    )
+  def getLimits = limits
   
-  def getProjectLinks(from: Int, until: Int, minDegree: Int) =
+  def getProjectLinks(from: Int, until: Int, minDegree: Int) = {
+    println( "Calculating project links from %d until %d with minimum degree %d".format(from,until,minDegree) )
     commits
-      .filter( c => isCommitInRange(c, from, until) )
-      .mapReduce[Map[User,Set[Project]]](groupProjectByUser)
+      .log( cs => println( "Filter %d time bins".format(cs.size) ) )
+      .filterKeys( k => k >= from && k <= until ).values.flatten
+      .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
+      .mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
       .values
-      .mapReduce[Map[Link,Int]](projectsToLinks)
+      .log( psets => println( "Reducing %d project sets to link map".format(psets.size) ) )
+      .flatMapReduce[Map[Link,Int]]( projectsToLinks )
+      .log( lm => println( "Filter %d links by degree".format(lm.size) ) )
       .filter( _._2 >= minDegree )
-    
+  }
+
   def getD3Data(from: Int, until: Int, minDegree: Int) = {
     val links = 
       getProjectLinks(from, until, minDegree)
+    println( "Convert project links to D3 data" )
+    val projectMap =
+      links
+        .mapReduce[Map[Int,Int]]( t => linksToProjects(t._1).map( p => (p,1) ) )
     val involvedProjects =
-      links.keySet
-        .mapReduce[Set[Project]](linksToProjects)
-        .toList
+      projectMap.keySet.toList
     val d3nodes =
       involvedProjects
-        .map( projectToD3Node )
+        .map( p => D3Node(p,projects.get(p).getOrElse("Unknown project with id %d".format(p)),projectMap.get(p).getOrElse(1)) )
     val d3links =
       links
-        .map( t => linkToD3Link(involvedProjects)(t._1, t._2) )
+        .map( t => D3Link( involvedProjects.indexOf(t._1.pId1), involvedProjects.indexOf(t._1.pId2), t._2 ) )
+    println( "Return D3 graph" )
     D3Graph(d3nodes,d3links)
   }
   
@@ -60,67 +78,50 @@ object GHRelationsViz {
   
   private val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
   
-  def readCommitsFromURL(url: URL) =
+  def getLines(url: URL) =
     scalax.io.Resource.fromURL(url)
-      .lines()
-      .flatMap( parseStringToCommit )
+                      .lines()
 
-  def parseStringToCommit(str: String) = {
+  private val IntStringReg = """([^ ]+) ([^ ]+)""".r  
+  def parseStringToIntString(str: String) = {
     try {
-      val TReg(pId, pName, uId, uName, ts) = str
-      Some(Commit(Project(pId.toInt,pName),User(uId.toInt,uName),ts.toInt))      
+      val IntStringReg(id, name) = str
+      Some( id.toInt -> name  )
     } catch {
       case _ => None
     }
   }  
 
-  def parseStringToCommitFiltered(from: Int, to: Int, period: Int)(str: String) = {
+  private val CommitReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
+  def parseStringToBinnedCommit(period: Int)(str: String) = {
     try {
-      val TReg(pId, pName, uId, uName, ts) = str
-      val t = ts.toInt
-      val tt = t - (t % period)
-      if ( tt >= from && tt <= to )
-        Some(Commit(Project(pId.toInt,pName),User(uId.toInt,uName),tt))
-      else
-        None
+      val CommitReg(pId, pName, uId, uName, ts) = str
+      val t = getBinnedTime(period)(ts.toInt)
+      Some( Commit(pId.toInt,uId.toInt,t) )
     } catch {
       case _ => None
     }
-  }
+  }  
+    
+  def getBinnedTime(period: Int)(time: Int) =
+    time - (time % period)
   
-  def isCommitInRange(c: Commit, from: Int, until: Int) = 
-    c.timestamp >= from && c.timestamp <= until
-    
-  def isActorTask(c: Commit, divisor: Int, remainder: Int) =
-      c.user.id%divisor==remainder
-    
-
   def groupProjectByUser(c: Commit) =
-    (c.user,c.project)
+    (c.userId,c.projectId)
 
-  def binCommitByPeriod(period: Int)(c: Commit) =
-    c.copy(timestamp = c.timestamp - (c.timestamp % period))
-
-  def projectsToLinks(ps: Set[Project]) = 
-    ps.subsets(2)
-      .map( (ss) => {
-        val l = ss.toList
-        (Link(l(0),l(1)).normalize,1)
-      } )
-  
-  def linksToProjectsAndAdjacencyMap(l: Link) =
-    (Set(l.p1,l.p2),(l.p1,l.p2))
-  
-  def zipWithOption[A,B](lookup: Map[A,B])(a: A) =
-    (a -> lookup.get(a))
+  def projectsToLinks(ps: Set[Int]) = {
+    createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) 
+  }
+    
+  def createProduct[A](as: Set[A]): Set[(A,A)] =
+    as.subsets(2)
+      .map( s => (s.head,s.tail.head) )
+      .toSet
 
   def linksToProjects(l: Link) =
-    Set(l.p1,l.p2)
-
-  def projectToD3Node(p: Project) =
-    new D3Node(p.name)
+    Set(l.pId1,l.pId2)
   
-  def linkToD3Link(lookup: Seq[Project])(l: Link, v: Int) =
-    new D3Link( lookup.indexOf(l.p1), lookup.indexOf(l.p2), v )
-    
+  def isActorTask(c: Commit, divisor: Int, remainder: Int) =
+      c.userId%divisor==remainder
+
 }

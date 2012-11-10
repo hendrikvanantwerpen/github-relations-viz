@@ -5,10 +5,8 @@ collaborators.
 
 ## Visualization
 
-Integrate http://bl.ocks.org/2514276 in the front-end. Dragging the
-canvas is needed for larger graphs (unles we can make them fit), the
-fish-eye is great for exploring. Also the pop-up is handier then the
-labels I think.
+ * Can we do this http://bl.ocks.org/1667367? The timeline with the commits histogram?
+ * The graph works best if the background covers everything, can we keep it fixed?
 
 What does the data look like? And after different steps?
 What if the data was bigger? Impact on data processing, visualisation?

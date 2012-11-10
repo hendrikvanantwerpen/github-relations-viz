@@ -1,15 +1,17 @@
 <html>
   <head>
     <title>Github Project Relations Viz</title>
-    <link rel="stylesheet" href="jquery-ui.css" />
-    <script language="javascript" type="text/javascript" src="jquery.js"></script>
-    <script language="javascript" type="text/javascript" src="jquery-ui.js"></script>
-    <script language="javascript" type="text/javascript" src="d3.v2.js"></script>
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.1/themes/base/jquery-ui.css" />
+    <link rel="stylesheet" href="main.css" />
+    <script type="text/javascript" src="http://d3js.org/d3.v2.min.js"></script>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.8.2.js"></script>
+    <script type="text/javascript" src="http://code.jquery.com/ui/1.9.1/jquery-ui.min.js"></script>
     <script type="text/javascript" src="main.js"></script>
   </head>
   <body>
-    <div id="graphanchor"></div>
-    <p>&nbsp;</p>
+    <div id="graph">
+    </div>
+    <br />
     <div><span>From: </span><span id="date-from"></span></div>
     <div><span>To: </span><span id="date-to"></span></div>
     <br />
@@ -22,5 +24,15 @@
     <div id="statusdiv"><span id="labelID">Status: </span><span id="statusLabel">ready</span></div>
     <br/>
     <button id="refresh">Refresh graph</button>
+      <div id="pop-up">
+        <div id="pop-up-title"></div>
+          <div id="pop-up-content">
+            <table> <tr>
+              <td><div id="pop-img"></div></td>
+              <td><div id="pop-desc"></div></td>
+            </tr> </table>
+          </div>
+        </div>
+      </div>
   </body>
 </html>

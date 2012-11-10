@@ -30,7 +30,7 @@ object ReductionPerformance extends App {
     .drop( 0*LIMIT )
     .take( LIMIT )
     .par
-    .flatMap( GHRelationsViz.parseStringToCommit )
+    .flatMap( GHRelationsViz.parseStringToBinnedCommit(PERIOD) )
     .seq
   }
 

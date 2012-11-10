@@ -7,118 +7,177 @@ $(document).ready(function(){
     var minTime = maxTime = 0
     var degree = 1
 
-    function createGraph() {
-    }
+    d3.fisheye = function() {
+        var radius = 200,
+            power = 2,
+            k0,
+            k1,
+            center = [0, 0];
+  
+      function fisheye(d) {
+          var dx = d.x - center[0],
+              dy = d.y - center[1],
+              dd = Math.sqrt(dx * dx + dy * dy);
+          if (dd >= radius) return {x: d.x, y: d.y, z: 1};
+          var k = k0 * (1 - Math.exp(-dd * k1)) / dd * .75 + .25;
+          return {x: center[0] + dx * k, y: center[1] + dy * k, z: Math.min(k, 10)};
+      }
+  
+      function rescale() {
+          k0 = Math.exp(power);
+          k0 = k0 / (k0 - 1) * radius;
+          k1 = power / radius;
+          return fisheye;
+      }
+  
+      fisheye.radius = function(_) {
+          if (!arguments.length) return radius;
+          radius = +_;
+          return rescale();
+      };
+  
+      fisheye.power = function(_) {
+          if (!arguments.length) return power;
+          power = +_;
+          return rescale();
+      };
+  
+      fisheye.center = function(_) {
+          if (!arguments.length) return center;
+          center = _;
+          return fisheye;
+      };
+  
+      return rescale();
+    };
 
     function updateGraph(nodes,links) {
-        // rather crude way to reset the graph for now, updating is nicer
-        $( "#graphanchor" ).html( "" )
+        $( "#graph" ).html( "" )
 
-        var w = 960, h = 500;
+        var w = $( "#graph" ).width(),
+            h = $( "#graph" ).height(),
+            fill = d3.scale.category20(),
+            trans = [0,0]
+            scale = 1;
 
-        var vis = d3.select("#graphanchor").append("svg:svg").attr("width", w).attr("height", h);
+        var fisheye = d3.fisheye()
+                        .radius(100)
+                        .power(3);
 
-        var labelAnchors = [];
-        var labelAnchorLinks = [];
+        var vis = d3.select("#graph")
+                    .append("svg:svg")
+                    .attr("width", w)
+                    .attr("height", h)
+                    .attr("pointer-events", "all")
+                    .append('svg:g')
+                    .call(d3.behavior.zoom().on("zoom", onzoom ))
+                    .append('svg:g');
 
-        for(var i = 0; i < nodes.length; i++) {
-            var node = nodes[i];
-            labelAnchors.push({
-                node : node
-            });
-            labelAnchors.push({
-                node : node
-            });
-            labelAnchorLinks.push({
-                source : i * 2,
-                target : i * 2 + 1,
-                weight : 1
-            });
-        };
+        var background = vis.append('svg:rect')
+                            .attr('width', w)
+                            .attr('height', h)
+                            .attr('fill', 'white');
+
+        function onzoom() {
+            scale = d3.event.scale
+            trans = d3.event.translate
+            vis.attr("transform","translate("+trans+")"+" scale("+scale+")");
+            background.attr("transform","translate("+[-trans[0]/scale,-trans[1]/scale]+") scale("+1/scale+")");
+        }
 
         var force = d3.layout.force()
                       .size([w, h])
                       .nodes(nodes)
                       .links(links)
-                      .gravity(1)
-                      //.linkDistance(50)
-                      .linkDistance(function(l,i){ return 200/(l.value*l.value); })
                       .charge(-1000)
-                      .linkStrength(10);
-                      //.linkStrength(function(x) { return x.value * 10; });
+                      .linkDistance(function(d) { return 100/d.value; })
+                      .linkStrength(function(d){ return 0.2; });
+
+        var link = vis.selectAll("line.link")
+                      .data(links)
+                      .enter()
+                      .append("svg:line")
+                      .attr("class", "link")
+                      .style("stroke-width", function(d) { return Math.sqrt(d.value); })
+                      .style("stroke", "#CCC")
+                      .attr("x1", function(d) { return d.source.x; })
+                      .attr("y1", function(d) { return d.source.y; })
+                      .attr("x2", function(d) { return d.target.x; })
+                      .attr("y2", function(d) { return d.target.y; })
+                      .on("mouseover", showLinkPopup)
+                      .on("mouseout", hidePopup);
+
+        var node = vis.selectAll("circle.node")
+                      .data(nodes)
+                      .enter()
+                      .append("svg:circle")
+                      .attr("class", "node")
+                      .attr("cx", function(d) { return d.x; })
+                      .attr("cy", function(d) { return d.y; })
+                      .attr("r", function(d) { return d.weight; })
+                      .on("mouseover", showNodePopup)
+                      .on("mouseout", hidePopup);
+
+        vis.style("opacity", 1e-6)
+           .transition()
+           .duration(1000)
+           .style("opacity", 1);
 
         force.start();
+        var n = nodes.length;
+        for (var i = 10*n; i > 0; --i) force.tick();
+        force.stop();
 
-        var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(0).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
-        force2.start();
-
-        var link = vis.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "#CCC");
-
-        var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
-        node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);
-        node.call(force.drag);
-
-        var anchorLink = vis.selectAll("line.anchorLink").data(labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
-
-        var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
-        anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
-            anchorNode.append("svg:text").text(function(d, i) {
-            return i % 2 != 0 ? d.node.name : ""
-        }).style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
-
-        var updateLink = function() {
-            this.attr("x1", function(d) {
-                return d.source.x;
-            }).attr("y1", function(d) {
-                return d.source.y;
-            }).attr("x2", function(d) {
-                return d.target.x;
-            }).attr("y2", function(d) {
-                return d.target.y;
+        function showLinkPopup(d) {
+            var x = d3.event.x
+            var y = d3.event.y
+            $("#pop-up").fadeOut(100,function () {
+                // Popup content
+                $("#pop-up-title").html("Link");
+                $("#pop-img").html(d.value);
+                $("#pop-desc").html("contributors");
+                // Popup position
+                var popLeft = x+20;
+                var popTop = y+20;
+                $("#pop-up").css({"left":popLeft,"top":popTop});
+                $("#pop-up").fadeIn(100);
             });
-
         }
 
-        var updateNode = function() {
-            this.attr("transform", function(d) {
-                return "translate(" + d.x + "," + d.y + ")";
+        function showNodePopup(d) {
+            $("#pop-up").fadeOut(100,function () {
+                // Popup content
+                $("#pop-up-title").html("Project "+d.name);
+                $("#pop-img").html(d.weight);
+                $("#pop-desc").html("connected projects");
+                // Popup position
+                var popLeft = (d.x*scale)+trans[0]+20;//lE.cL[0] + 20;
+                var popTop = (d.y*scale)+trans[1]+20;//lE.cL[1] + 70;
+                $("#pop-up").css({"left":popLeft,"top":popTop});
+                $("#pop-up").fadeIn(100);
             });
-
         }
 
+        function hidePopup(d) {
+            $("#pop-up").fadeOut(50);
+            d3.select(this).attr("fill","url(#ten1)");
+        }
 
-        force.on("tick", function() {
+        vis.on("mousemove", function() {
 
-            force2.start();
+            fisheye.center(d3.mouse(this));
 
-            node.call(updateNode);
+            node.each(function(d) { d.display = fisheye(d); })
+                .attr("cx", function(d) { return d.display.x; })
+                .attr("cy", function(d) { return d.display.y; })
+                .attr("r", function(d) { return d.display.z * d.weight; });
 
-            anchorNode.each(function(d, i) {
-                if(i % 2 == 0) {
-                    d.x = d.node.x;
-                    d.y = d.node.y;
-                } else {
-                    var b = this.childNodes[1].getBBox();
-
-                    var diffX = d.x - d.node.x;
-                    var diffY = d.y - d.node.y;
-
-                    var dist = Math.sqrt(diffX * diffX + diffY * diffY);
-
-                    var shiftX = b.width * (diffX - dist) / (dist * 2);
-                    shiftX = Math.max(-b.width, Math.min(0, shiftX));
-                    var shiftY = 5;
-                    this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
-                }
-            });
-
-
-            anchorNode.call(updateNode);
-
-            link.call(updateLink);
-            anchorLink.call(updateLink);
-
+            link.attr("x1", function(d) { return d.source.display.x; })
+                .attr("y1", function(d) { return d.source.display.y; })
+                .attr("x2", function(d) { return d.target.display.x; })
+                .attr("y2", function(d) { return d.target.display.y; });
         });
+
     }
 
   function createUI(minDate,maxDate) {
@@ -155,7 +214,10 @@ $(document).ready(function(){
   
   function updateUI() {
       function fmtEpoch(e) {
-          return new Date(1000*e).toString();
+          var day = 24 * 3600;
+          var re = e - (e % day);
+          var d = new Date(1000*re);
+          return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
       }
       $( "#date-from" ).text( fmtEpoch(minTime) );
       $( "#date-to" ).text( fmtEpoch(maxTime) );

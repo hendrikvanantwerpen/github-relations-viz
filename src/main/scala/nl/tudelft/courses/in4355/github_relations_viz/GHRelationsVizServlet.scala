@@ -5,13 +5,20 @@ import scalate.ScalateSupport
 import net.liftweb.json._
 import net.liftweb.json.JsonDSL._
 import net.liftweb.json.Serialization.write
+import java.net.URL
 
 class GHRelationsVizServlet extends ScalatraServlet {
 
   implicit val formats = Serialization.formats(NoTypeHints)
 
-  val url = getClass.getResource("/commits.txt")
-  val processor = new GHRelationsViz(url)
+  println( "Create data processor" )
+  val PERIOD = 7 * 24 * 3600
+  val datadir = "file:///home/hendrik/edu/tudelft/in4355.bzr/github-relations-viz.git/commits"
+  val projectsurl = new URL(datadir+"/projects.txt")
+  val usersurl = new URL(datadir+"/users.txt")
+  val commitsurl = new URL(datadir+"/commits.txt")
+  val processor = new GHRelationsViz(projectsurl,usersurl,commitsurl,PERIOD)
+  println( "Ready to go!" )
   
   get("/range") {
     write(processor.getLimits)

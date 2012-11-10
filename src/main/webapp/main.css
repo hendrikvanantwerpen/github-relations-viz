@@ -1,0 +1,42 @@
+#graph {
+    width: 100%;
+    height: 65%;
+}
+
+circle.node {
+    fill: #f55;
+    stroke: #fff;
+    stroke-width: 1.5px;
+}
+
+line.link {
+    stroke: #999;
+    stroke-opacity: .6;
+}
+
+div#pop-up {
+    display: none;
+    position:absolute;
+    color: white;
+    font-size: 14px;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 10px 5px 10px;
+    -moz-border-radius: 8px 8px;
+    border-radius: 8px 8px;
+}
+div#pop-up-title {
+    font-size: 15px;
+    width:200px;
+    margin-bottom: 4px;
+    font-weight: bolder;
+}
+div#pop-up-content {
+    font-size: 12px;
+}
+div#pop-desc {
+    width: 100px;
+}
+div#pop-img {
+    font-size: 30px;
+    font-weight: bolder;
+}
