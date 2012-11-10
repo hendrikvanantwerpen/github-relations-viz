@@ -9,6 +9,7 @@ import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Logger._
+import scala.collection.parallel.ParMap
 
 class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: Int) {
   import GHRelationsViz._
@@ -21,14 +22,15 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
   println( "Reading users" )
   val users =
     getLines(usersurl)
-      .flatMapReduce[Map[Int,String]]( parseStringToIntString ).toList
+      .flatMapReduce[Map[Int,String]]( parseStringToIntString )
     
   println( "Reading commits" )
   val commits =
-    getLines(commitsurl).flatMapReduce[Map[Int,Set[Commit]]] { l => 
-      val c = parseStringToBinnedCommit(period)(l)
-      c.filter( _.timestamp != 0 ).map( c => (c.timestamp,c) )
-    }
+    getLines(commitsurl)
+      .flatMapReduce[Map[Int,Set[Commit]]] { l => 
+        val c = parseStringToBinnedCommit(period)(l)
+        c.filter( c => c.timestamp != 0 ).map( c => (c.timestamp,c) )
+      }
 
   println( "Calculating limits" )
   val limits = Range(
@@ -43,12 +45,13 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
     println( "Calculating project links from %d until %d with minimum degree %d".format(from,until,minDegree) )
     commits
       .log( cs => println( "Filter %d time bins".format(cs.size) ) )
-      .filterKeys( k => k >= from && k <= until ).values.flatten
+      .par.filter( e => e._1 >= from && e._1 <= until )
+      .seq.values.flatten
       .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
-      .mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
+      .par.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
       .values
       .log( psets => println( "Reducing %d project sets to link map".format(psets.size) ) )
-      .flatMapReduce[Map[Link,Int]]( projectsToLinks )
+      .par.flatMapReduce[ParMap[Link,Int]]( projectsToLinks )
       .log( lm => println( "Filter %d links by degree".format(lm.size) ) )
       .filter( _._2 >= minDegree )
   }
@@ -59,17 +62,17 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
     println( "Convert project links to D3 data" )
     val projectMap =
       links
-        .mapReduce[Map[Int,Int]]( t => linksToProjects(t._1).map( p => (p,1) ) )
+        .par.mapReduce[Map[Int,Int]]( t => linksToProjects(t._1).map( p => (p,1) ) )
     val involvedProjects =
       projectMap.keySet.toList
     val d3nodes =
       involvedProjects
-        .map( p => D3Node(p,projects.get(p).getOrElse("Unknown project with id %d".format(p)),projectMap.get(p).getOrElse(1)) )
+        .par.map( p => D3Node(p,projects.get(p).getOrElse("Unknown project with id %d".format(p)),projectMap.get(p).getOrElse(1)) )
     val d3links =
       links
-        .map( t => D3Link( involvedProjects.indexOf(t._1.pId1), involvedProjects.indexOf(t._1.pId2), t._2 ) )
+        .par.map( t => D3Link( involvedProjects.indexOf(t._1.pId1), involvedProjects.indexOf(t._1.pId2), t._2 ) )
     println( "Return D3 graph" )
-    D3Graph(d3nodes,d3links)
+    D3Graph(d3nodes.seq,d3links.seq)
   }
   
 }

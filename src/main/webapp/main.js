@@ -89,7 +89,7 @@ $(document).ready(function(){
                       .size([w, h])
                       .nodes(nodes)
                       .links(links)
-                      .charge(-1000)
+                      .charge(-500)
                       .linkDistance(function(d) { return 100/d.value; })
                       .linkStrength(function(d){ return 0.2; });
 
@@ -124,16 +124,16 @@ $(document).ready(function(){
            .style("opacity", 1);
 
         force.start();
-        var n = nodes.length;
-        for (var i = 10*n; i > 0; --i) force.tick();
-        force.stop();
+        //var n = nodes.length;
+        //for (var i = n*n; i > 0; --i) force.tick();
+        //force.stop();
 
         function showLinkPopup(d) {
             var x = d3.event.x
             var y = d3.event.y
             $("#pop-up").fadeOut(100,function () {
                 // Popup content
-                $("#pop-up-title").html("Link");
+                $("#pop-up-title").html("Link: "+d.source.name+" - "+d.target.name);
                 $("#pop-img").html(d.value);
                 $("#pop-desc").html("contributors");
                 // Popup position
@@ -147,7 +147,7 @@ $(document).ready(function(){
         function showNodePopup(d) {
             $("#pop-up").fadeOut(100,function () {
                 // Popup content
-                $("#pop-up-title").html("Project "+d.name);
+                $("#pop-up-title").html("Project: "+d.name);
                 $("#pop-img").html(d.weight);
                 $("#pop-desc").html("connected projects");
                 // Popup position
