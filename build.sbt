@@ -39,6 +39,6 @@ fork in run := true
 
 javaOptions ++=Seq(
 "-XX:+UseParallelGC",
-"-Xms3048m",
-"-Xmx3048m"
+"-Xms2048m",
+"-Xmx4096m"
 )

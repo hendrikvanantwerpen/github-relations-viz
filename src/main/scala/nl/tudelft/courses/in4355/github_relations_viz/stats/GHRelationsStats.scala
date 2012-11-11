@@ -3,25 +3,15 @@ package nl.tudelft.courses.in4355.github_relations_viz.stats
 import java.net.URL
 import java.util.Date
 import scala.collection.immutable.SortedMap
-import scalaz._
-import Scalaz._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import scala.collection.SortedSet
-
-case class Link(p1:Int,p2:Int) {
-    def normalize = {
-      if ( p2 < p1 ) {
-        Link(p2,p1)
-      } else {
-        this
-      }
-    }
-  }
+import nl.tudelft.courses.in4355.github_relations_viz.GHEntities._
+import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz._
 
 trait Writer {
   def write(msg: Any)
-  def writeln(msg: Any)  
+  def writeln(msg: Any)
 }
 
 class FileWriter(filename: String) extends Writer {
@@ -29,7 +19,7 @@ class FileWriter(filename: String) extends Writer {
   res.truncate(0)
   private val writer = res.writer
   override def write(msg: Any) = writer.write(msg.toString)
-  override def writeln(msg: Any) = writer.write(msg.toString+"\n")  
+  override def writeln(msg: Any) = writer.write(msg.toString+"\n")
 }
 
 class TeeWriter(writer: Writer) extends Writer {
@@ -39,15 +29,13 @@ class TeeWriter(writer: Writer) extends Writer {
 
 object GHRelationsStats extends App {
 
-  val epoch_20100101 = 1262300400
-  val epoch_20100701 = 1277935200
-  val epoch_20110101 = 1293836400
-  val epoch_20110701 = 1309471200
+  val epoch1990 = 631148400
+  val epoch2015= 1420066800  
 
   val PERIOD    = 7 * 24 * 3600
-  val FROM      = epoch_20100701
-  val TO        = epoch_20110101
-  val MINDEGREE = 2
+  val FROM      = epoch1990
+  val TO        = epoch2015
+  val MINWEIGHT = 1
 
   // GENERAL FUNCTIONS
 
@@ -59,7 +47,7 @@ object GHRelationsStats extends App {
   val dataDir = "doc/images/"
   val userProjectLinksPerWeekFile = dataDir+"user-project-links-per-week.dat"
   val projectsPerUserHistFile = dataDir+"projects-per-user-histogram.dat"
-  val linkDegreeHistFile = dataDir+"link-degree-histogram.dat"
+  val linkWeightHistFile = dataDir+"link-weight-histogram.dat"
   
   def getLines(url: URL) =
     scalax.io.Resource.fromURL(url)
@@ -67,15 +55,6 @@ object GHRelationsStats extends App {
 
   def getBinnedTime(period: Int)(time: Int) =
     time - (time % period)
-
-  def createProduct[A](as: Set[A]): Set[(A,A)] =
-      if ( as.size > 1 ) {
-        val h = as.head
-        val t = as.tail
-        t.map( (h,_) ) ++ createProduct( t )
-      } else {
-        Set.empty
-      }
 
   private val IntStringReg = """([^ ]+) ([^ ]+)""".r  
   def parseStringToIntString(str: String) = {
@@ -140,10 +119,11 @@ object GHRelationsStats extends App {
   
   logger.writeln("Reduce commits to timeindexed Map")
   val (total,bcm) = timed("reducing",logger.writeln) {
-    cs.mapReduce[(Int,Map[Int,Set[(Int,Int)]])]( c => {
-      val tb = getBinnedTime(PERIOD)(c._3)
-      (1,(tb,(c._1,c._2)))
-    } )
+    cs.filter( c => c._3 >= FROM && c._3 <= TO )
+      .mapReduce[(Int,Map[Int,Set[(Int,Int)]])]( c => {
+        val tb = getBinnedTime(PERIOD)(c._3)
+        (1,(tb,(c._1,c._2)))
+      } )
   }
   val n = (0 /: bcm)( _ + _._2.size )
   val p = (n.toDouble/total.toDouble)*100.0
@@ -162,25 +142,26 @@ object GHRelationsStats extends App {
     fcs.mapReduce[Map[Int,Set[Int]]]( c => (c._2,c._1) )
   }
   
-  val upHist = ups.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
+  val projectsPerUserHist = ups.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
   val ppuh = new FileWriter(projectsPerUserHistFile)
-  upHist.foreach( l => ppuh.writeln( "%d %d".format(l._1,l._2) ))
-  val totalLinks = (0 /: upHist)( (t,e) => {
-      val n = e._1
-      val nl = ((n+1)*n)/2
-      t + (nl * e._2)
+  projectsPerUserHist.foreach( l => ppuh.writeln( "%d %d".format(l._1,l._2) ))
+  val totalLinks = projectsPerUserHist.mapReduce[Int]( t => {
+    val nUsers = t._2
+    val nProjects = t._1
+    val maxLinks = nUsers * ((nProjects+1)*nProjects) / 2
+    maxLinks
   } )
-  logger.writeln("Maximum project links is "+totalLinks)
+  logger.writeln("Going to process "+totalLinks+" project links")
   
-  val links = timed("calculating project links",logger.writeln) {
+  val links = timed("Calculating project links",logger.writeln) {
     ups.values
-       .mapReduce[Map[SortedSet[Int],Int]]( ps =>
-          createProduct(ps).map( l => (SortedSet(l._1,l._2),1) ) )
+       .mapReduce[Map[Link,Int]]( ps =>
+          createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) )
   }
   logger.writeln("Found "+links.size+" project links")
   
   val linkHist = links.mapReduce[SortedMap[Int,Int]]( l => l._2 -> 1 )
-  val ldh = new FileWriter(linkDegreeHistFile)
+  val ldh = new FileWriter(linkWeightHistFile)
   linkHist.foreach( l => ldh.writeln( "%d %d".format(l._1,l._2) ))
   
   logger.writeln("Done")

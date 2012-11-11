@@ -5,7 +5,7 @@ $(document).ready(function(){
     });
 
     var minTime = maxTime = 0
-    var degree = 1
+    var minWeight = 1
 
     d3.fisheye = function() {
         var radius = 200,
@@ -193,13 +193,13 @@ $(document).ready(function(){
       }
     });
     
-    $( "#degree-range-slider" ).slider({
+    $( "#min-weight-range-slider" ).slider({
       range: false,
       min: 1,
       max: 20,
-      values: [ degree ],
+      values: [ minWeight ],
       slide: function( event, ui ) {
-          degree = ui.values[0];
+          minWeight = ui.values[0];
           updateUI();
       }
     });
@@ -221,7 +221,7 @@ $(document).ready(function(){
       }
       $( "#date-from" ).text( fmtEpoch(minTime) );
       $( "#date-to" ).text( fmtEpoch(maxTime) );
-      $('#degree').text( degree );
+      $('#min-weight').text( minWeight );
   }
 
   function updateStatus(msg) {
@@ -234,7 +234,7 @@ $(document).ready(function(){
           updateStatus("try again later - request in progress");
       } else {
         updateStatus('loading...');
-        request = $.getJSON('/d3data?from='+minTime+'&to='+maxTime+'&degree='+degree)
+        request = $.getJSON('/d3data?from='+minTime+'&to='+maxTime+'&minWeight='+minWeight)
         .success(function(json){
           request = null;
           if ( !$.isEmptyObject(json) ) {

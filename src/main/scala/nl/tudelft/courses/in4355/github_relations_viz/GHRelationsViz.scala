@@ -34,16 +34,15 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
       }
 
   println( "Calculating limits" )
-  val limits = Range(
-      (Int.MaxValue /: commits.keySet)( (a,ts) => math.min(a,ts) ),
-      (Int.MinValue /: commits.keySet)( (a,ts) => math.max(a,ts) )
-  )
+  val limits = Range(epoch1990,epoch2015)
+      //(Int.MaxValue /: commits.keySet)( (a,ts) => math.min(a,ts) ),
+      //(Int.MinValue /: commits.keySet)( (a,ts) => math.max(a,ts) )
+  //)
   
-  val epoch2000_01_01 = 946684800
   def getLimits = limits
   
-  def getProjectLinks(from: Int, until: Int, minDegree: Int) = {
-    println( "Calculating project links from %d until %d with minimum degree %d".format(from,until,minDegree) )
+  def getProjectLinks(from: Int, until: Int, minWeight: Int) = {
+    println( "Calculating project links from %d until %d with minimum weight %d".format(from,until,minWeight) )
     commits
       .log( cs => println( "Filter %d time bins".format(cs.size) ) )
       .par.filter( e => e._1 >= from && e._1 <= until )
@@ -53,13 +52,13 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
       .values
       .log( psets => println( "Reducing %d project sets to link map".format(psets.size) ) )
       .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
-      .log( lm => println( "Filter %d links by degree".format(lm.size) ) )
-      .filter( _._2 >= minDegree )
+      .log( lm => println( "Filter %d links by weight".format(lm.size) ) )
+      .filter( _._2 >= minWeight )
   }
 
-  def getD3Data(from: Int, until: Int, minDegree: Int) = {
+  def getD3Data(from: Int, until: Int, minWeight: Int) = {
     val links = 
-      getProjectLinks(from, until, minDegree)
+      getProjectLinks(from, until, minWeight)
     println( "Convert project links to D3 data" )
     val projectMap =
       links
@@ -79,6 +78,9 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
 }
 
 object GHRelationsViz {
+
+  val epoch1990 = 631148400
+  val epoch2015= 1420066800  
   
   private val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
   
