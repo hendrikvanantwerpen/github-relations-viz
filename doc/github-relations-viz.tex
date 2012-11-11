@@ -28,14 +28,11 @@
   morestring=[b]"""
 }
 \lstset{
-  %frame=tb,
   language=scala,
-  %aboveskip=3mm,
-  %belowskip=3mm,
   showstringspaces=false,
   numbers=left,
-  breaklines=false,
-  columns=flexible,
+  columns=fixed,
+  breaklines=true,
   captionpos=t,
   basicstyle={\footnotesize\ttfamily}
 }
@@ -107,13 +104,13 @@ The data we used was a list of all projects with their main programming language
     \hline
 \end{tabular}
 
-Some more details on the date can be seen in figures \ref{fig:commits-by-date} (commits over time), \ref{fig:link-degree-hist} (link degree) and \ref{fig:projects-per-user-hist} (projects per user).
+Some more details on the date can be seen in figures \ref{fig:user-project-links-per-week} (commits over time), \ref{fig:link-degree-hist} (link degree) and \ref{fig:projects-per-user-hist} (projects per user).
 
 \begin{figure}[htb]
     \centering
-    \includegraphics[width=0.75\textwidth]{commits-per-week}
+    \includegraphics[width=0.75\textwidth]{user-project-links-per-week}
     \caption{Commits by date}
-    \label{fig:commits-by-date}
+    \label{fig:user-project-links-per-week}
 \end{figure}
 
 \begin{figure}[htb]
@@ -152,7 +149,7 @@ Processing data can be elegantly expressed as a stream of filter and transform o
 
 An increasingly popular model for processing big data sets is MapReduce \citep{dean2008mapreduce}. This model lends itself well for distribution and parallel data processing. One descendant of this model is found in Google's Sawzall \citep{pike2005interpreting}, using aggregators as a key abstraction. In \cite{lammel2008google} a rigorous description of these two models is provided. The Sawzall concept of aggregators is identified as a generalized form of monoids. Their properties allow easy combination of parallel computed partial results, possible in a hierarchical way. Because monoids for common data types like lists, maps and tuples are readily available, developers need think less about the reduction of intermediate results and can focus on the map part of the process.
 
-Sawzall is very liberal in the output it accepts from map functions. The output can be a monoid, a collection of the monoid or an element if the monoid is a collection itself. To capture all these L\"ammel defines aggregators in terms of generalized monoids:
+Sawzall is very liberal in the output it accepts from map functions. The output can be a monoid, a collection of the monoid or an element if the monoid is a collection itself. To capture all these L\"ammel defines aggregators as generalized monoids:
 \begin{lstlisting}[language=haskell]
 class Monoid m => Aggregator e m | e -> m
   where
@@ -170,40 +167,63 @@ trait Aggregator[A,B] {
   def insert(a: A, b: B): A
 }
 \end{lstlisting}
-Although L\"ammel requires the type \lstinline|A| to be a monoid, we dropped this requirement for reasons that will become clear later. An \lstinline|Aggregator| where \lstinline|A| and \lstinline|B| are the same type behaves the same as a monoid of that type.
+Because there is no readily available monoid type in Scala and we will reason about aggregators only, we dropped the requirement that \lstinline|A| has to be a monoid. We use the term monoid aggregator for any \lstinline|Aggregator| where \lstinline|A| and \lstinline|B| are the same type, because this behaves the same as a monoid of that type would.
 
-We defined the \lstinline[language=haskell]|minsert| function in Scala as \lstinline!a |<| b!. Whenever this operator is used, the compiler infers a fitting Aggregator. All Scala \lstinline|implicit| rules apply, so if no Aggregator is found there's compile time error, if multiple are found the programmer has to specify programmatically which one to use.
+We defined the \lstinline[language=haskell]|minsert| function in Scala as \lstinline!a |<| b!. Whenever this operator is used, the compiler infers which \lstinline|Aggregator| to use. All Scala \lstinline|implicit| rules apply, so if no \lstinline|Aggregator| is found there's compile time error, if multiple are found the programmer has to specify programmatically which one to use.
 
 Assuming an appending aggregator for \lstinline|List| and a summing one for \lstinline|Int|, we now can do things like the following:
 \begin{lstlisting}
-val r:Int = i:Int |<| j:Int // sum ints
-val r:List[Int] = l:List[Int] |<| m:List[Int] // concat lists
-val r:List[Int] = l:List[Int] |<| i:Int // append int element to list
+// Int |<| Int : Int
+1 |<| 2 // = 3
+
+// List[Int] |<| List[Int] : List[Int]
+List(1,2) |<| List(3,4) // = List(1, 2, 3, 4)
+
+// List[Int] |<| Int : List[Int]
+List(1,2) |<| 3 // = List(1, 2, 3)
 \end{lstlisting}
 
-Combining our aggregators with type inference and the very generic Scala collections library (see \citep{odersky2009fighting} for more details), we were able to provide aggregators for all Scala collections (including parallel ones) by implementing only seven aggregators. For each one of \lstinline|Set|, \lstinline|Seq| and \lstinline|Map|, we implemented an aggregator for monoid behaviour and one for element insertion. Because we don't require our aggregator collection to be a strict monoid, we could make the monoid aggregator very liberal in its accepted input. The collections library defines every collection type to be a subtype of \lstinline|GenTraversableOnce[A]|. Instead of only accepting collections of the same type to be inserted, we can now accept any collection as long as the element type matches. Here are some examples:
+Combining our aggregators with type inference and the very generic Scala collections library (see \citep{odersky2009fighting} for more details), we were able to provide aggregators for all Scala collections (including parallel ones) by implementing only seven aggregators. For each one of \lstinline|Set|, \lstinline|Seq| and \lstinline|Map|, we implemented a monoid aggregator and one for element insertion.
+
+We used the fact that every Scala collection type is a subtype of \lstinline|GenTraversableOnce[A]| to allow liberal input on the monoid aggregator. Instead of only accepting collections of the same type to be inserted, we can now accept any collection as long as the element type matches. Here are some examples:
 \begin{lstlisting}
-val r:List[Int] = l:List[Int] |<| s:Set[Int]
-val r:TreeMap[Int,Int] = tm:TreeMap[Int,Int] |<| sm:SortedMap[Int,Int]
-//val r:Map[Int,Int] = m:Map[Int,Int] |<| l:List[(Int,Int)] // doesn't work?
+// List[Int] = List[Int] |<| Set[Int]
+List(1,2) |<| Set(3) // = List(1,2,3)
+
+// TreeMap[Int,Int] |<| SortedMap[Int,Int] : TreeMap[Int,Int]
+TreeMap(1 -> 1, 2 -> 1) |<| SortedMap(1 -> 2) // TreeMap(1 -> 3, 2 -> 1)
+
+// Map[Int,Int] |<| l:List[(Int,Int)] : Map[Int,Int]
+// Map(1 -> 2) |<| List((1,1)) // = error, why?
 \end{lstlisting}
 The last example is something that is expected to work (\lstinline|Map[K,V] <: Traversable[(K,V)]|, but is somehow not inferred by the compiler. Discussions online suggest that the compiler doesn't consider the complete type hierarchy when inferring, but only a few levels. The seventh aggregator was implemented to handle this special case.
 
-A nice property of monoids is that they can be structurally combined. For example a tuple with two monoid values is itself a monoid. In our aggregator world, we happen to have similar properties. Aggregators for \lstinline|TupleN| and \lstinline|Map| where implemented to require their tuple values and map value to be aggregators themselves. The fact that we only have aggregators and don't differentiate between monoid append and element insertion really pays of here. When creating deep structures, on every level we have the choice to insert either a value or a collection. Some examples should show the flexibility this gives us:
+A nice property of monoids is that they can be structurally combined. For example a tuple with two monoid values is itself a monoid. In our aggregator world, we happen to have similar properties. Aggregators for \lstinline|TupleN| and \lstinline|Map| where implemented to require their tuple values and map value to be aggregators themselves. This is a difference with L\"ammels description, where nested values can only be strict monoids. Out approach introduces a lot of flexibility in the elements that can be inserted. When creating deep structures, on every level we have the choice to insert either a value or a collection. Some examples should show the flexibility this gives us:
 \begin{lstlisting}
-// inserted tuples contain collections or elements. values are independent
-val r:(Set[Int],Set[String]) = t1:(Set[Int],Set[String]) |<| t2:(Set[Int],Set[String])
-val r:(Set[Int],Set[String]) = t1:(Set[Int],Set[String]) |<| t2:(Int,String)
-val r:(Set[Int],Set[String]) = t1:(Set[Int],Set[String]) |<| t2:(Set[Int],String)
+// (Int,Set[String]) |<| (Int,Set[String]) : (Int,Set[String])
+(2,Set("aap")) |<| (2,Set("aap","noot")) // = (4,Set(aap, noot))
+
+// (Set[Int],Set[Int]) |<| (Int,Int) : (Set[Int],Set[String])
+(Set(1),Set(2)) |<| (1,1) // = (Set(1),Set(2, 1))
+
+// (Set[Int],Set[Int]) |<| (Int,Set[Int]) : (Set[Int],Set[Int])
+(Set(1),Set(2)) |<| (1,Set(1)) // = (Set(1),Set(2, 1))
 
 // three level deep structures
-val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| Map[Int,Set[String]]
-val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| Map[Int,String]
-val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| (Int,Set[String])
-val m:Map[Int,Set[String]] = Map[Int,Set[String]] |<| (Int,String)
+// Map[Int,Set[String]] |<| Map[Int,Set[String]] :Map[Int,Set[String]]
+// Map[Int,Set[String]] |<| Map[Int,String] :Map[Int,Set[String]]
+// Map[Int,Set[String]] |<| (Int,Set[String]) :Map[Int,Set[String]]
+// Map[Int,Set[String]] |<| (Int,String) :Map[Int,Set[String]]
 \end{lstlisting}
 
 Our design allows a lot of freedom in the shape of the elements inserted into a collection. What type of elements can be inserted is dictated by the defined aggregators and fully inferred by the compiler. The aggregators for the Scala collections are very generic and in most cases the developer doesn't have to care about how to merge collections. For opaque values aggregators are implemented for string concatenation and integer summing, but others are very easy to implement; one implicit function and an implementation of the \lstinline|Aggregator| trait is enough.
+
+One aspect of the Sawzall aggregators is not addressed yet: the possibility to insert a collection of elements. For this case we implemented an aggregator similar to L\"ammel's \lstinline[language=haskell]|Group| aggregator. Note that this works again at every level of nested types, so this allows us to do things like:
+\begin{lstlisting}
+val r:Int = i:Int |<| is:List[Int]
+val r:Map[Int,Int] |<| e:(Int,List[Int])
+val r:Map[Int,Int] |<| es:List[(Int,List[Int])]
+\end{lstlisting}
 
 \subsection{MapReduce}
 
@@ -217,7 +237,7 @@ val wc = docs.mapReduce[Map[String,Int]]( wordcount )
 // wc has type Map[String,Int] here
 \end{lstlisting}
 
-The performance of our map-reduce in the same order and range as hand written code using e.g. \lstinline|foldLeft|. Most of the work is done through inference by the compiler. At runtime the aggregators use folds and collection operations just as you would in handwritten code. There a little overhead of some function calls, but all the reduction details are abstracted away, resulting in less repetition and simpler data transformation functions.
+The performance of our map-reduce is in the range as hand written code using e.g. \lstinline|foldLeft|. Most of the work is done through inference by the compiler. At runtime the aggregators use folds and collection operations just as you would in handwritten code. There a little overhead of some function calls, but all the reduction details are abstracted away, resulting in less repetition and simpler data transformation functions.
 
 With this result we can write our processing steps from section \ref{sec:data} in Scala. You can see how they mix with the existing collection library functions.
 \begin{lstlisting}
@@ -225,10 +245,10 @@ val commits: List[Commit] = ...
 def projectsToPairs(ps: List[Project]): List[(Project,Project)] = ...
 val linkMap = 
   commits.filter( c => c.timestamp >= from && c.timestamp <= until  )
-          .mapReduce[Map[User,Set[Project]]]( c => (c.user,c.project) )
-          .values
-          .mapReduce[Map[(Project,Project),Int]](projectsToParis)
-          .filter( _._2 >= minDegree )
+         .mapReduce[Map[User,Set[Project]]]( c => (c.user,c.project) )
+         .values
+         .mapReduce[Map[(Project,Project),Int]](projectsToParis)
+         .filter( _._2 >= minDegree )
 \end{lstlisting}
 
 It is possible that multiple aggregators for the same type exist, for example a sum and a product on numbers. In such a case it is very easy to specify which one to use. Here is a small example:
@@ -242,7 +262,7 @@ val prodOfWordLengths = words.mapReduce( w => w.size )(ProductMonoid)
 \end{lstlisting}
 As you can see the result type is not required, because it is inferred from the aggregator.
 
-One aspect of the Sawzall model we described in the beginning is not addressed yet. The possibility to insert a collection. This case is handled by the \lstinline|flatMapReduce| function, which is the map-reduce version of \lstinline|flatMap|. This does nothing more then iterating over a \lstinline|Traversable| and inserting every element individually. Because every Scala collection is a \lstinline|Traversable| of its element type, reductions of collection monoids can be written both with \lstinline|mapReduce| as with \lstinline|flatMapReduce|. The implementation in the former could be more efficient, taking the more specific type into account.
+This fully implements the Sawzall map-reduce model as it is formalized in \cite{lammel2008google}. The use of aggregators instead of monoids, gives us even more freedom in the output of our map functions than L\"ammel's model does. The integration with the Scala collections library makes using map-reduce very easy for programmers used to that idiom.
 
 \section{Distributed data-processing with Akka}\label{sec:distributed}
 
@@ -313,7 +333,7 @@ Content die hendrik wil:
     \item What did we want to address
     \item How did we design the actors, where was the caching, where which processing steps
     \item What was the performance (did we speed up response time?)
-    \item A design diagram
+    \item A design or system diagram
 \end{itemize}
 
 \section{Visualization in the browser with D3}\label{sec:visualization}

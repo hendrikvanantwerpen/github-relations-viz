@@ -81,7 +81,7 @@ class LinkcombineApplication {
     println("Got the results!, size: "+results.size)
 
 
-    val resultMap = results.foldLeft(Map[Link,Int]())   ((i,s) => i |<<| s)
+    val resultMap = results.foldLeft(Map[Link,Int]())   ((i,s) => i |<| s)
     println("Folded size: "+resultMap.size)
     //.flatMapReduce[Map[Link,Int]](projectsToLinks)
     //results.filter( _._2 >= minDegree )

@@ -25,7 +25,7 @@ class GHObtainLinks(url: URL, divisor: Int, remainder: Int) {
 	 println("Done filtering, result is %d lines".format(filtered.size))
 	 val grouped = filtered.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
 	 println("Done grouping. Result is %d size".format(grouped.size))
-	 val links = grouped.values.flatMapReduce[Map[Link,Int]](projectsToLinks)
+	 val links = grouped.values.mapReduce[Map[Link,Int]](projectsToLinks)
 	 println("Done creating links. Size is %d".format(links.size))
 	 links
 	}

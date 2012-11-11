@@ -17,19 +17,20 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
   println( "Reading projects" )
   val projects =
     getLines(projectsurl)
-      .flatMapReduce[Map[Int,String]]( parseStringToIntString )
+      .mapReduce[Map[Int,String]]( parseStringToIntString(_) toList )
   
   println( "Reading users" )
   val users =
     getLines(usersurl)
-      .flatMapReduce[Map[Int,String]]( parseStringToIntString )
+      .mapReduce[Map[Int,String]]( parseStringToIntString(_) toList )
     
   println( "Reading commits" )
   val commits =
     getLines(commitsurl)
-      .flatMapReduce[Map[Int,Set[Commit]]] { l => 
+      .mapReduce[Map[Int,Set[Commit]]] { l => 
         val c = parseStringToBinnedCommit(period)(l)
         c.filter( c => c.timestamp != 0 ).map( c => (c.timestamp,c) )
+         .toList
       }
 
   println( "Calculating limits" )
@@ -51,7 +52,7 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
       .par.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
       .values
       .log( psets => println( "Reducing %d project sets to link map".format(psets.size) ) )
-      .par.flatMapReduce[ParMap[Link,Int]]( projectsToLinks )
+      .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
       .log( lm => println( "Filter %d links by degree".format(lm.size) ) )
       .filter( _._2 >= minDegree )
   }
