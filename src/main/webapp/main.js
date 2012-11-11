@@ -116,7 +116,8 @@ $(document).ready(function(){
                       .attr("cy", function(d) { return d.y; })
                       .attr("r", function(d) { return d.weight; })
                       .on("mouseover", showNodePopup)
-                      .on("mouseout", hidePopup);
+                      .on("mouseout", hidePopup)
+                      .call(force.drag);
 
         vis.style("opacity", 1e-6)
            .transition()
