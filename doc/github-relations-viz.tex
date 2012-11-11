@@ -286,16 +286,14 @@ The result is the simple system below
 
 \begin{figure}[htb]
     \centering
-    \includegraphics[width=0.75\textwidth]{actors_simple}
+    \includegraphics[width=1.00\textwidth]{ActorSystemSample}
     \caption{Simple computation actor system}
-    \label{fig:simple computation actor system}
+    \label{fig:actor_sample}
 \end{figure}
-
-\todo{deze afbeelding updaten met nieuwe naam}
 
 This is not sufficient yet. Everything is an actor, so there needs to be an actor for all tasks. For this we add two more actors. One actor is the "web service" actor. This actor handles the requests, which in our case is only "showProjectLinks(interval, degree)". The last actor is the "JSONConvertActor". This actor is responsible for converting the result of the computation actor into a JSON format, which can be handled by the display part. This JSON result is then sent to the user.
 
-So what happens now when a request is described below, and can be seen in \ref{fig:actorSequence}
+So what happens now when a request is described below, and can be seen in \ref{fig:actor_seq}
 
 \begin{itemize}
 	\item{An user requests a projectLinkJSON for an interval and degree}
@@ -307,18 +305,39 @@ So what happens now when a request is described below, and can be seen in \ref{f
 
 \begin{figure}[htb]
     \centering
-    \includegraphics[width=1.0\textwidth]{ActorSequence}
+    \includegraphics[width=1.0\textwidth]{RequestLinks}
     \caption{A sequence diagram for a project link request}
-    \label{fig:actorSequence}
+    \label{fig:actor_seq}
 \end{figure}
+
+\todo{webservice request ook "asynchroon" in de diagram zetten, dat is ie namelijk wel}
 
 \todo{Naam consequent doen, met of zonder actor in de naam. Met is beter denk ik}
 
-When looking at \ref{fig:actorSequence} it is very nice to see the "WebserviceActor" and the "LinkCombinerActor" only just initiate the process. As described above the result of a request is stored in a future, and the result is piped to a new actor. This means after the initiation the "WebserviceActor" and the "LinkCombinerActor" do need to receive any more messages after that.
+When looking at \ref{fig:actor_seq} it is very nice to see the "WebserviceActor" and the "LinkCombinerActor" only just initiate the process. As described above the result of a request is stored in a future, and the result is piped to a new actor. This means after the initiation the "WebserviceActor" and the "LinkCombinerActor" do need to receive any more messages after that.
 
 \todo{beter uitleggen dat het proces event-driven is en niet blockt.}
 
 \subsection{scalability}
+
+A big advantage of the design of the actor system is the scalability. Off course more LinkComputerActors can be used by the single combiner actor in \ref{fig:actor_sample}, but that would mean a lot of project links to be send to the same actor, resulting a lot of data flow at a single actor. 
+
+As can be seen in the sequence diagram, both the "LinkCombineActor" and the "LinkComputerActor" can receive a project-link request. Because the actors are completely independent, they do not need to know how the project links are obtained. Therefore both actors can be substituted for each other, as shown in  \ref{fig:example_scalable}. This way a tree can be constructed with link combiners and link computers, and each link computer will reduce the project-links of the next level in the tree. This way the system can be scaled into any desired size.
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=1.00\textwidth]{ActorSystemSampleExtended}
+    \caption{Example of extended actor system}
+    \label{fig:example_scalable}
+\end{figure}
+
+\subsection{speedup}
+
+When computing all project links for a single month on the same computer, with average hardware, it takes about 60 seconds to compute all project links. 
+
+Below here, the runtime stats per step, + explanation about the speedup + graph
+
+
 
 \begin{itemize}
 	\item diepere uitleg implementatie met futures
