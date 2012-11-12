@@ -341,11 +341,14 @@ What Akka actually does behind the scenes for each future is to creating a new a
 
 \subsection{Distribution}
 
-In order to reduce the total computation time by distributing the data over multiple actors, the data needs to be cut into multiple parts. Simply cutting the dataset in multiple pieces is not possible in this case. A link between a project is defined as a "common committer". By splitting the dataset and computing one for example one half on one actor and the other half on a second actor could cause these common commits to be broken. 
+In order to reduce the total computation time by distributing the data over multiple actors, the data needs to be cut into multiple parts. Randomly cutting the dataset in multiple pieces is not possible in this case. A link between a project is defined as a "common committer". By splitting the dataset and computing one half on one actor and the other half on a second actor could cause these common commits to be broken. 
 
-Therefore we came up with the following solution. We initially give each actor system access to the entire dataset. Then, when an computation-actor is created, it receives a set of users for whose commits it is responsible. This set of users we defined by taking the remainder of a modulo operation on the userid. With a set of user's the actor can now compute the entire process towards the project links, except for the filtering on the weight of the link. For that last operation an actor needs to be sure that it has all links between a project in order to be sure the result is correct, for which it would also the commits from the other users.
+Therefore we came up with the following solution. We initially give each actor system access to the entire dataset. Then, when an computation-actor is created, it receives a set of users for whose commits it is responsible. We distribute the commits in a round robin fashion over the actors based on userid. With a set of users the actor can compute the entire process towards the project links, except for the filtering on the weight of the link. For that last operation an actor needs to be sure that it has all links between a project in order to produce a correct result. This is done at the highest level of the computation hierarchy when all links are available.
 
-A disadvantage is that booting up the system does not have any speedup, or is even slower when reading from the same datasource, because every actor needs to read all commits in order to select the commits based on the users it is responsible for. This however does not influence the response time, because the system is only booted once after which the user's commits are kept in the memory of the computation actors. Finally once the actors respond to the request, they send all the project links they computed to the actor that sent the request (using the "Ask" pattern). The actor that requested the project links receives them and a reduction is done, after which the filter operation over the weight can be done.
+The startup of the system does not receive any speedup, because still all project links need to read into memory. After that the computation of further requests will be in parallel. Once the actors respond to the request, they send all the project links they computed to the actor that sent the request (using the "Ask" pattern). The actor that requested the project links receives them and a reduction is done, after which the filter operation over the weight can be done.
+
+
+As can be seen in the figure, two more actors were also added in this figure. These are actors that handle communication with the user. The "WebserviceActor" is an actor that receives requests from the user, then creates a future for the link-results which are requested from the LinkCombinerActor, and pipes the result to the JSONConverterActor. When the JSONConverterActor receives a list of project links, it will convert them to a JSON format for D3, and send the JSON code to the user. The entire communication flow when a LinkRequest is done is shown in figure \ref{fig:actor_seq}
 
 The result is the simple system below
 
@@ -355,20 +358,6 @@ The result is the simple system below
     \caption{Simple computation actor system}
     \label{fig:actor_sample}
 \end{figure}
-
-
-As can be seen in the figure, two more actors were also added in this figure. These are actors that handle communication with the user. The "WebserviceActor" is an actor that receives requests from the user, then creates a future for the link-results which are requested from the LinkCombinerActor, and pipes the result to the JSONConverterActor. When the JSONConverterActor receives a list of project links, it will convert them to a JSON format for D3, and send the JSON code to the user. The entire communication flow when a LinkRequest is done is shown in figure \ref{fig:actor_seq}
-
-%So what happens now when a request is described below, and can be seen in \ref{fig:actor_seq}
-
-%\begin{itemize}
-%	\item{An user requests a projectLinkJSON for an interval and weight}
-%	\item{The Webservice actor receives this request sends an asks request to the LinkCombinerActor. The resulting future is then piped to the JSONConverterActor.}
-%	\item{The LinkCombinerActor receives the request from the ProjectLinkMaster, and then asks the project links from all Compute actors it knows they exist. The resulting list of futures is sequence, resuling in a future of a list of project links. On this monad a reduce operation is qeued, and the result is piped to the sender of the request}
-%	\item{The Compute actors receive a request to compute projectlinks, which they do, and send the result back to the sender of the message}
-%	\item{Now all the futures and pipeto's are in place, at some point the JSONConverterActor will receive a ProjectLinkMessage. This message contains the project links, which it will transform into JSON and then send the result to the user}
-%\end{itemize}
-
 
 \begin{figure}[htb]
     \centering
@@ -381,15 +370,17 @@ As can be seen in the figure, two more actors were also added in this figure. Th
 
 \todo{Naam consequent doen, met of zonder actor in de naam. Met is beter denk ik}
 
-When looking at figure \ref{fig:actor_seq} it is very nice to see the "WebserviceActor" and the "LinkCombinerActor" only just initiate the process. As described above the result of a request is stored in a future, and the result is piped to a new actor. This means after they receive the request both the "WebserviceActor" and the "LinkCombinerActors" do not involve the process any more. The communication flows trough the Future's they intiated.
+When looking at figure \ref{fig:actor_seq} it is very nice to see the "WebserviceActor" and the "LinkCombinerActor" only just initiate the process. As described above the result of a request is stored in a future, and the result is piped to a new actor. This means after they receive the request both the "WebserviceActor" and the "LinkCombinerActors" are not involved in the process any more. The communication flows through the Future's they intiated.
 
 \todo{beter uitleggen dat het proces event-driven is en niet blockt.}
 
-\subsection{scalability}
+\subsection{Scalability}
 
 A big advantage of the design of the actor system is the scalability. Off course more LinkComputerActors can be used by the single combiner actor in figure \ref{fig:actor_sample}, but that would mean a lot of project links to be send to the same actor, resulting a lot of data flow at a single actor. 
 
 As can be seen in the sequence diagram, both the "LinkCombineActor" and the "LinkComputerActor" can receive a project-link request. Because the actors are completely independent, they do not need to know how the project links are obtained. Therefore both actors can be substituted for each other, as shown in figure \ref{fig:example_scalable}. This way a tree can be constructed with link combiners and link computers, and each link computer will reduce the project-links of the next level in the tree. This way the system can be scaled into any desired size.
+
+We have not tested the speedup of the system by using the distributed actor system at this moment. We expect a positive effect on the responsiveness of the system, but have no data yet to support this.
 
 \begin{figure}[htb]
     \centering
@@ -397,13 +388,6 @@ As can be seen in the sequence diagram, both the "LinkCombineActor" and the "Lin
     \caption{Example of extended actor system}
     \label{fig:example_scalable}
 \end{figure}
-
-\subsection{speedup}
-
-When computing all project links for a single month on the same computer, with average hardware, it takes about 60 seconds to compute all project links. 
-
-Below here, the runtime stats per step, + explanation about the speedup + graph
-
 
 \section{Visualization in the browser with D3}\label{sec:visualization}
 
