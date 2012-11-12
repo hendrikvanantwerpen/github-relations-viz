@@ -329,13 +329,13 @@ val linkMap =
 \end{lstlisting}
 
 \section{Distributed data-processing with Akka}\label{sec:distributed}
-Even tough the computation of the project links has been optimised, still a lot of data needs to be processed. Our dataset consisted of 14 million commits. Because of this a request on a set of project links for a given time-interval and weight could take multiple minutes to compute. Such long waiting times are not acceptable, so we decided to distribute the computation by using actors. Because the system was built in Scala, the most logical choice for this is using the Akka toolkit, which is as far as we know the only available actor toolkit for Scala.
+Even tough the computation of the project links has been optimised, still a lot of data needs to be processed; Our dataset consists of 14 million commits. Because of this a request on a set of project links for a given time-interval and weight could take . This might be ok for computing a single graph, but when observing the changes over time a lot of computation needs to be done, and this computation time is not acceptable. Therefore we decided to distribute the computation by using actors. Because the system was built in Scala, the most logical choice for this is using the Akka toolkit, which is as far as we know the only available actor toolkit for Scala.
 
 \subsection{Akka}
 
 Akka is a toolkit for, as they state themselves, "building highly concurrent, distributed event driven applications". You can both use akka with Java and Scala, but in our opinion it integrates a lot better with Scala. The main parts in Akka that were used for the distribution were the "Actors" and "Futures". In Akka you can very easily create actors on multiple systems, pass references of actors to other systemsand send messages between actors. When configured properly each actor reference is "network aware", meaning that you can pass a reference from one system to another while the reference remains intact.
 
-With these actors "Futures" become very useful. One can "ask" an actor a specific request, and store the result in a future. A future is a monad, which means operations can de mapped over the future while the result is still being processed by a different actor. \todo{Is this a correct way of explaining it?} Then finally one can pipe the result of the future to another actor, so when the actor which was asked the request fires its result, the operations mapped over the future monad are executed and the result is sent as a message to the actor it was piped to. What Akka actually did behind the scenes was creating another actor, which reacted on the "reply message", computed the operations that were done on the future, and send the result to the actor the future was piped to. This can also be seen in \ref{fig:actor_seq}, which will be explained later.
+With these actors "Futures" become very useful. One can "ask" an actor a specific request, and store the result in a future. A future is a monad, which means operations can de mapped over the future while the result is still being processed by a different actor. \todo{Is this a correct way of explaining it?} Then finally one can pipe the result of the future to another actor, so when the actor which was asked the request fires its result, the operations mapped over the future monad are executed and the result is sent as a message to the actor it was piped to. What Akka actually did behind the scenes was creating another actor, which reacted on the "reply message", computed the operations that were done on the future, and send the result to the actor the future was piped to. This can also be seen in figure \ref{fig:actor_seq}, which will be explained later.
 
 \subsection{Distribution}
 
@@ -356,7 +356,7 @@ The result is the simple system below
 \end{figure}
 
 
-As can be seen in the figure, two more actors were also added in this figure. These are actors that handle communication with the user. The "WebserviceActor" is an actor that receives requests from the user, then creates a future for the LinkResults which are requested from the LinkCombinerActor, and pipes the result to the JSONConverterActor. When the JSONConverterActor receives a list of project links, it will convert them to a JSON format for D3, and send the JSON code to the user. The entire communication flow when a LinkRequest is done cis shown in \ref{fig:actor_seq}
+As can be seen in the figure, two more actors were also added in this figure. These are actors that handle communication with the user. The "WebserviceActor" is an actor that receives requests from the user, then creates a future for the link-results which are requested from the LinkCombinerActor, and pipes the result to the JSONConverterActor. When the JSONConverterActor receives a list of project links, it will convert them to a JSON format for D3, and send the JSON code to the user. The entire communication flow when a LinkRequest is done is shown in figure \ref{fig:actor_seq}
 
 %So what happens now when a request is described below, and can be seen in \ref{fig:actor_seq}
 
@@ -380,15 +380,15 @@ As can be seen in the figure, two more actors were also added in this figure. Th
 
 \todo{Naam consequent doen, met of zonder actor in de naam. Met is beter denk ik}
 
-When looking at \ref{fig:actor_seq} it is very nice to see the "WebserviceActor" and the "LinkCombinerActor" only just initiate the process. As described above the result of a request is stored in a future, and the result is piped to a new actor. This means after the initiation the "WebserviceActor" and the "LinkCombinerActor" do need to receive any more messages after that.
+When looking at figure \ref{fig:actor_seq} it is very nice to see the "WebserviceActor" and the "LinkCombinerActor" only just initiate the process. As described above the result of a request is stored in a future, and the result is piped to a new actor. This means after they receive the request both the "WebserviceActor" and the "LinkCombinerActors" do not involve the process any more. The communication flows trough the Future's they intiated.
 
 \todo{beter uitleggen dat het proces event-driven is en niet blockt.}
 
 \subsection{scalability}
 
-A big advantage of the design of the actor system is the scalability. Off course more LinkComputerActors can be used by the single combiner actor in \ref{fig:actor_sample}, but that would mean a lot of project links to be send to the same actor, resulting a lot of data flow at a single actor. 
+A big advantage of the design of the actor system is the scalability. Off course more LinkComputerActors can be used by the single combiner actor in figure \ref{fig:actor_sample}, but that would mean a lot of project links to be send to the same actor, resulting a lot of data flow at a single actor. 
 
-As can be seen in the sequence diagram, both the "LinkCombineActor" and the "LinkComputerActor" can receive a project-link request. Because the actors are completely independent, they do not need to know how the project links are obtained. Therefore both actors can be substituted for each other, as shown in  \ref{fig:example_scalable}. This way a tree can be constructed with link combiners and link computers, and each link computer will reduce the project-links of the next level in the tree. This way the system can be scaled into any desired size.
+As can be seen in the sequence diagram, both the "LinkCombineActor" and the "LinkComputerActor" can receive a project-link request. Because the actors are completely independent, they do not need to know how the project links are obtained. Therefore both actors can be substituted for each other, as shown in figure \ref{fig:example_scalable}. This way a tree can be constructed with link combiners and link computers, and each link computer will reduce the project-links of the next level in the tree. This way the system can be scaled into any desired size.
 
 \begin{figure}[htb]
     \centering
@@ -404,24 +404,13 @@ When computing all project links for a single month on the same computer, with a
 Below here, the runtime stats per step, + explanation about the speedup + graph
 
 
-
-\begin{itemize}
-	\item diepere uitleg implementatie met futures
-	\item uitleg schaalbaarheid van systeem, met diagram van uitgebreid systeem
-	\item hypothese over snelheidsoptimalisatie
-\end{itemize}
-
-
-Content die hendrik wil:
-
-\begin{itemize}
-    \item What did we want to address
-    \item How did we design the actors, where was the caching, where which processing steps
-    \item What was the performance (did we speed up response time?)
-    \item A design or system diagram
-\end{itemize}
-
 \section{Visualization in the browser with D3}\label{sec:visualization}
+
+Finally, when the data has been computed to links between projects, we need a way to show this data. The objective is to provide a clear way of showing the relation between projects on github. Therefore we want to show a clear overview on how different projects are linked to each other. Also we both want to show the degree of a project (how many other projects is it linked to), and the weight of the link between a project (of how many common contributors does the link consist). Therefore we chose to use a force-directed graph, and show the degree of the project as node-size and the weight of a project in the thickness of a link. This way the force-algorithm will automatically group related projects close together in clusters. In order to get a good overview the navigation over the graph is also very important. In order to browse trough the graph, the graph also needs to be zoomable and navigable.
+
+After some investigation into available tools we found a tool called "Data Driven Documents", in short D3 \footnote{Website: \url{http://d3js.org}}. D3 is a general visualisation library written in javascript, using SVG for the visualisation. D3 includes the "Force Layout", which builds a force directed graph. For the dataset D3 requires a set of Nodes (in our case, projects) and a set of links (thus the project links), which can be passed as JSON document. It also allows to pass a value for the degree and weight for both the projects and the project-links. With some customisation of the style the graphs shown below is obtained \todo{Toevoegen referentie naar graph}
+
+As can be seen in \todo{figure reference} the different project groups are very clearly shown, which provides very interesting results for future investigation. The navigation over the entire graph can easily be done by dragging with the mouse over the graph, and zooming in and out with the mouse wheel.
 
 \begin{itemize}
     \item What did we want to show?
@@ -447,9 +436,5 @@ We believe the given approach can be easily adapted to include other parameters 
 
 \bibliographystyle{abbrvnat}
 \bibliography{github-relations-viz}
-
-\appendix
-
-\section{Scala collection Aggregator example}
 
 \end{document}

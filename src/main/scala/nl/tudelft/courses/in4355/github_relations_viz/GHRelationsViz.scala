@@ -41,20 +41,24 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
   
   def getLimits = limits
   
+  
   def getProjectLinks(from: Int, until: Int, minWeight: Int) = {
+    Timer.tick
     println( "Calculating project links from %d until %d with minimum weight %d".format(from,until,minWeight) )
     commits
       .log( cs => println( "Filter %d time bins".format(cs.size) ) )
       .par.filter( e => e._1 >= from && e._1 <= until )
       .seq.values.flatten
-      .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
+      .log( cs => println("Done filtering in %d, Reduce %d commits to projects per user".format(Timer.tick, cs.size) ) )
       .par.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
       .values
-      .log( psets => println( "Reducing %d project sets to link map".format(psets.size) ) )
+      .log( psets => println("Done reducing 1 in %d, Reducing %d project sets to link map".format(Timer.tick, psets.size) ) )
       .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
-      .log( lm => println( "Filter %d links by weight".format(lm.size) ) )
+      .log( lm => println( "Done reducing 2 in %d, Filter %d links by weight".format(Timer.tick, lm.size) ) )
       .filter( _._2 >= minWeight )
+      .log(cs => println("Done filtering in %d".format(Timer.tick)))
   }
+  
 
   def getD3Data(from: Int, until: Int, minWeight: Int) = {
     val links = 
