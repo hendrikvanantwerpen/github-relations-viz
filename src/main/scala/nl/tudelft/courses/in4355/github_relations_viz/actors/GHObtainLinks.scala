@@ -23,7 +23,7 @@ class GHObtainLinks(url: URL, divisor: Int, remainder: Int) {
 	  //println("Started filtering %d lines".format(commits.size))
 	 val filtered = commits.filter( c => c.timestamp >= from && c.timestamp <= until )
 	 println("Done filtering, result is %d lines".format(filtered.size))
-	 val grouped = filtered.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
+	 val grouped = filtered.mapReduce[Map[Int,Set[Int]]]( c => (c.userId, c.projectId) )
 	 println("Done grouping. Result is %d size".format(grouped.size))
 	 val links = grouped.values.mapReduce[Map[Link,Int]](projectsToLinks)
 	 println("Done creating links. Size is %d".format(links.size))

@@ -16,8 +16,9 @@ class GHRelationsVizServlet extends ScalatraServlet {
   val datadir = "file:commits/"
   val projectsurl = new URL(datadir+"projects.txt")
   val usersurl = new URL(datadir+"users.txt")
+  val forksurl = new URL(datadir+"forks.txt")
   val commitsurl = new URL(datadir+"commits.txt")
-  val processor = new GHRelationsViz(projectsurl,usersurl,commitsurl,PERIOD)
+  val processor = new GHRelationsViz(projectsurl,usersurl,forksurl,commitsurl,PERIOD)
   println( "Ready to go!" )
   
   get("/range") {

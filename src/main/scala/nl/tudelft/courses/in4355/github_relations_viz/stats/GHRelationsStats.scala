@@ -29,9 +29,6 @@ class TeeWriter(writer: Writer) extends Writer {
 
 object GHRelationsStats extends App {
 
-  val epoch1990 = 631148400
-  val epoch2015= 1420066800  
-
   val PERIOD    = 7 * 24 * 3600
   val FROM      = epoch1990
   val TO        = epoch2015
@@ -42,6 +39,7 @@ object GHRelationsStats extends App {
   val commitsurl = new URL("file:commits/commits.txt")
   val usersurl = new URL("file:commits/users.txt")
   val projectsurl = new URL("file:commits/projects.txt")
+  val forksurl = new URL("file:commits/forks.txt")
   val logfile = "stats.log"
     
   val dataDir = "doc/images/"
@@ -49,33 +47,6 @@ object GHRelationsStats extends App {
   val projectsPerUserHistFile = dataDir+"projects-per-user-histogram.dat"
   val linkWeightHistFile = dataDir+"link-weight-histogram.dat"
   
-  def getLines(url: URL) =
-    scalax.io.Resource.fromURL(url)
-                      .lines()
-
-  def getBinnedTime(period: Int)(time: Int) =
-    time - (time % period)
-
-  private val IntStringReg = """([^ ]+) ([^ ]+)""".r  
-  def parseStringToIntString(str: String) = {
-    try {
-      val IntStringReg(id, name) = str
-      Some( id.toInt -> name  )
-    } catch {
-      case _ => None
-    }
-  }  
-
-  private val CommitReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
-  def parseStringToCommitTuple(str: String) = {
-    try {
-      val CommitReg(pId, pName, uId, uName, ts) = str
-      Some( (pId.toInt,uId.toInt,ts.toInt) )
-    } catch {
-      case _ => None
-    }
-  }  
-
   def timed[A](msg: String, l: String => Unit)(f: => A): A = {
     l(msg+" ...")
     val start = System.nanoTime()
@@ -95,6 +66,7 @@ object GHRelationsStats extends App {
   val commitlines = getLines(commitsurl)
   val projectlines = getLines(projectsurl)
   val userlines = getLines(usersurl)
+  val forklines = getLines(forksurl)
   val logger = new TeeWriter(new FileWriter(logfile))
 
   logger.write("Starting statistics calculation")
@@ -102,47 +74,62 @@ object GHRelationsStats extends App {
 
   logger.writeln("Build project map")
   val projects = timed("reading",logger.writeln) {
-    getLines(projectsurl).mapReduce[Map[Int,String]]( parseStringToIntString(_) toList )
+    (Map.empty[ProjectRef,Project] /: getLines(projectsurl)) { (m,l) => 
+      parseStringToProject(l).map( m + _ ).getOrElse( m ) 
+    }
   }
-  logger.writeln("Found "+projects.size+" projects")
+  logger.writeln("Found %d projects".format(projects.size) )
   
   logger.writeln("Build user map")
   val users = timed("reading",logger.writeln) {
-    getLines(usersurl).mapReduce[Map[Int,String]]( parseStringToIntString(_) toList )
+    (Map.empty[UserRef,User] /: getLines(usersurl)) { (m,l) => 
+      parseStringToUser(l).map( m + _ ).getOrElse( m )
+    }
   }
-  logger.writeln("Found "+users.size+" users")
-  
-  logger.writeln("Read commits")
-  val cs = timed("reading",logger.writeln) {
-    getLines(commitsurl).flatMap( parseStringToCommitTuple )
+  logger.writeln("Found %d users".format(users.size) )
+
+  logger.writeln("Read forks")
+  val forks = timed("reading",logger.writeln) {
+    getLines(forksurl)
+      .mapReduce[Set[ProjectRef]] { l =>
+        parseStringToFork(l).map( _.projectId ).toList
+      }
   }
+  logger.writeln("Found %d forks".format(forks.size) )
   
-  logger.writeln("Reduce commits to timeindexed Map")
-  val (total,bcm) = timed("reducing",logger.writeln) {
-    cs.filter( c => c._3 >= FROM && c._3 <= TO )
-      .mapReduce[(Int,Map[Int,Set[(Int,Int)]])]( c => {
-        val tb = getBinnedTime(PERIOD)(c._3)
-        (1,(tb,(c._1,c._2)))
-      } )
+  logger.writeln("Read commits to timeindexed Map")
+  val (total,bcm) = timed("reading",logger.writeln) {
+    getLines(commitsurl)
+      .mapReduce[(Int,Map[Int,Set[(UserRef,ProjectRef)]])] { l => 
+        val c = parseStringToCommit(l)
+        c.filter( c => c.timestamp != 0 &&
+                  c.timestamp >= FROM &&
+                  c.timestamp <= TO &&
+                  !forks.contains(c.projectId) )
+         .map { c => 
+           (1,(getBinnedTime(PERIOD)(c.timestamp),(c.userId,c.projectId))) 
+         }
+         .toList
+      }
   }
   val n = (0 /: bcm)( _ + _._2.size )
   val p = (n.toDouble/total.toDouble)*100.0
-  logger.writeln("Reduced "+total+" commits to "+n+" ("+p+"%) user-project links in "+bcm.size+" bins")
+  logger.writeln("Reduced %d commits to %d (%.2f%%) user-project links in %d bins".format(total,n,p,bcm.size) )
   
-  val userProjectLinksPerWeek = bcm.mapReduce[SortedMap[Int,Int]]( e => e._1 -> e._2.size )
+  val userProjectLinksPerWeek = bcm.par.mapReduce[SortedMap[Int,Int]]( e => e._1 -> e._2.size )
   val wch = new FileWriter(userProjectLinksPerWeekFile)
   userProjectLinksPerWeek.foreach( l => wch.writeln( "%d %d".format(l._1,l._2) ))
   
   val fcs = timed("filter time",logger.writeln) {
-    bcm.filterKeys( k => k >= FROM && k <= TO ).values.flatten
+    bcm.par.filter( e => e._1 >= FROM && e._1 <= TO ).seq.values.flatten
   }
-  logger.writeln("Kept "+fcs.size+" user-project links after time filter")
+  logger.writeln("Kept %d user-project links after time filter".format(fcs.size) )
   
   val ups = timed("group projects by user",logger.writeln) {
-    fcs.mapReduce[Map[Int,Set[Int]]]( c => (c._2,c._1) )
+    fcs.par.reduceTo[Map[Int,Set[Int]]]
   }
   
-  val projectsPerUserHist = ups.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
+  val projectsPerUserHist = ups.par.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
   val ppuh = new FileWriter(projectsPerUserHistFile)
   projectsPerUserHist.foreach( l => ppuh.writeln( "%d %d".format(l._1,l._2) ))
   val totalLinks = projectsPerUserHist.mapReduce[Int]( t => {
@@ -151,16 +138,14 @@ object GHRelationsStats extends App {
     val maxLinks = nUsers * ((nProjects+1)*nProjects) / 2
     maxLinks
   } )
-  logger.writeln("Going to process "+totalLinks+" project links")
+  logger.writeln("Going to process %d project links".format(totalLinks) )
   
   val links = timed("Calculating project links",logger.writeln) {
-    ups.values
-       .mapReduce[Map[Link,Int]]( ps =>
-          createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) )
+    ups.values.par.mapReduce[Map[Link,Int]]( projectsToLinks )
   }
-  logger.writeln("Found "+links.size+" project links")
+  logger.writeln("Found %d project links".format(links.size) )
   
-  val linkHist = links.mapReduce[SortedMap[Int,Int]]( l => l._2 -> 1 )
+  val linkHist = links.par.mapReduce[SortedMap[Int,Int]]( l => l._2 -> 1 )
   val ldh = new FileWriter(linkWeightHistFile)
   linkHist.foreach( l => ldh.writeln( "%d %d".format(l._1,l._2) ))
   
