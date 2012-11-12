@@ -63,12 +63,12 @@
 \maketitle
 
 \begin{abstract}
-GitHub has emerged as an interesting object of study for software repository analysis because of the data available through its open API. Visualizing this data can be challenging, because of the lack of knowledge about its structure and because of the size of the dataset. For distributed processing of large data sets functional programming languages and techniques and models like MapReduce have become increasingly popular. In this report we describe a web based system that makes it possible to explore one type of relation in GitHub, the links between projects based on common committers. Users can explore the data by selecting time limits, minimum link weight and project language. This report describes the implementation of that system in the object-oriented function programming language Scala, using Sawzall style aggregators and other function programming techniques.
+GitHub has emerged as an interesting object of study for software repository analysis because of the data available through its open API. Visualizing this data can be challenging, because of the lack of knowledge about its structure and because of the size of the dataset. For distributed processing of large data sets functional programming techniques and models like MapReduce have become increasingly popular. In this report we describe a web based system that makes it possible to explore one type of relation in GitHub; the links between projects based on common committers. Users can explore the data by selecting time limits and minimum link weight. This report describes the implementation of that system in the object-oriented function programming language Scala, using Sawzall style aggregators and other functional programming techniques.
 \end{abstract}
 
 \section{Introduction}
 
-In the field of software repository mining, GitHub has emerged as an interesting subject of study and tools have emerged to collect and publish the data it publishes \citep{gousios2012ghtorrent}. Making sense of the data and visualizing it in interesting ways is not trivial. Finding interesting correlations and metrics is hard. Interactive software that visualizes aspects of the data while the user can influence constraints like time period or project language allows easy exploration of the data and can be a starting point for more formal analysis.
+In the field of software repository mining, GitHub has emerged as an interesting subject of study. Tools have emerged to collect and publish the data that GitHub exposes \citep{gousios2012ghtorrent}. Making sense of the data and visualizing it in interesting ways is not trivial. Finding interesting correlations and metrics is hard. Interactive software that visualizes aspects of the data while the user can influence constraints like time period or project language allows easy exploration of the data and can be a starting point for more formal analysis.
 
 We present a web based software system that allows a user to explore relations between projects on GitHub. A relation is defined by the existence of a common committer. The user can influence the time period wherein the link must exists, the main programming language of the project and the minimum number of committers before a link is shown.
 
@@ -86,7 +86,7 @@ The report is structured as following:
     \item A description of the data and the data processing (section \ref{sec:data}).
     \item A description of a MapReduce implementation in Scala, created to implement the data processing (section \ref{sec:mapreduce}).
     \item A description of the distributed design of the backend, created to improve responsiveness of the software (section \ref{sec:distributed}).
-    \item A description of the visualization used in the software (section \ref{sec:visualization}).
+    \item A description of the visualization used in the web interface (section \ref{sec:visualization}).
     \item Conclusions and ideas for further research and development (section \ref{sec:conclusions}).
 \end{itemize}
 
@@ -98,11 +98,11 @@ The raw data available was a list of projects and their main programming languag
     \centering
     \begin{tabular}{l r}
         \hline
-        \#projects & ~600k \\
-        \#users & ~400k \\
+        \#projects & ~850k \\
+        \#users & ~750k \\
         \#commits & ~14m \\
         \#unique project-user links per week & ~3m \\
-        \#project links & 13m \\
+        \#project links & 11m \\
         \hline
     \end{tabular}
     \caption{Some numbers about the data set}
@@ -132,15 +132,13 @@ The raw data available was a list of projects and their main programming languag
 
 We allow the user to vary the following parameters:
 \begin{itemize}
-    \item Project language (limits projects within one ecosystem).
-    \item Time period in which the links are counted.
-    \item Minimum weight of a link before it's shown.
+    \item Time period.
+    \item Minimum weight of a link before it's included.
 \end{itemize}
-The desired end result is a list of links between projects, a weight on each link of the amount of common committers and a weight on each project of the amount of connected projects. This last property can identify central projects in the graph.
+The desired end result is a list of links between projects, the weight of each link and the weight of each project. This last property can identify central projects in the graph.
 
 Processing data can be elegantly expressed as a stream of filter and transform operations. Without considering implementation details, those steps will be:
 \begin{enumerate}
-    \item Filter projects for selected language.
     \item Filter commits and exclude commits outside of the selected time period or not in the filtered project list.
     \item Build a set of projects per user.
     \item For each user's projects, create links between those projects.
@@ -152,7 +150,7 @@ Processing data can be elegantly expressed as a stream of filter and transform o
 
 An increasingly popular model for processing big data sets is MapReduce \citep{dean2008mapreduce}. This model lends itself well for distribution and parallel data processing. One descendant of this model is found in Google's Sawzall \citep{pike2005interpreting}, using aggregators as a key abstraction. In \cite{lammel2008google} a rigorous description of these two models is provided. The Sawzall concept of aggregators is identified as a generalized form of monoids. Their properties allow easy combination of parallel computed partial results, possible in a hierarchical way. Because monoids for common data types like lists, maps and tuples are readily available, developers need think less about the reduction of intermediate results and can focus on the map part of the process.
 
-Sawzall is very liberal in the output it accepts from map functions. The output can be a monoid, a collection of the monoid or an element if the monoid is a collection itself. To capture all these L\"ammel defines aggregators as generalized monoids:
+Sawzall is very liberal in the output it accepts from map functions. The output can be a monoid, a collection of the monoid or an element if the monoid is a collection itself. To capture all these, L\"ammel defines aggregators as generalized monoids:
 \begin{lstlisting}[language=haskell]
 class Monoid m => Aggregator e m | e -> m
   where
@@ -170,9 +168,9 @@ trait Aggregator[A,B] {
   def insert(a: A, b: B): A
 }
 \end{lstlisting}
-Because there is no readily available monoid type in Scala and we will use aggregators only, we dropped the requirement that \lstinline|A| has to be a monoid. We use the term monoid aggregator for any \lstinline|Aggregator| where \lstinline|A| and \lstinline|B| are the same type, because this behaves the same as a monoid of that type would.
+Because there is no readily available monoid type in Scala and we will use aggregators only, we dropped the requirement that type \lstinline|A| has to be a monoid. We use the term monoid aggregator for any \lstinline|Aggregator| where \lstinline|A| and \lstinline|B| are the same type, because this behaves the same as a monoid of that type would.
 
-We defined the \lstinline[language=haskell]|minsert| function in Scala as \lstinline!a:A |<| b:B : A!. Whenever this operator is used, the compiler infers which \lstinline|Aggregator[A,B]| to use. All Scala \lstinline|implicit| rules apply, so if no \lstinline|Aggregator| is found there's compile time error, if multiple are found the programmer has to specify programmatically which one to use.
+We defined the \lstinline[language=haskell]|minsert| function in Scala as \lstinline!a:A |<| b:B : A!. Whenever this operator is used, the compiler infers which \lstinline|Aggregator[A,B]| to use. All Scala \lstinline|implicit| rules apply, so if no \lstinline|Aggregator| is found there's compile time error. If multiple options are found the programmer has to specify manually which one to use.
 
 We started with a basic monoid aggregator for sums, which serves as the default aggregator for integers in the rest of the examples. The implementation looks like:
 \begin{lstlisting}
@@ -273,7 +271,7 @@ Our design allows a lot of freedom in the shape of the elements inserted into a 
 
 \subsection{MapReduce}
 
-Using the developed aggregators, a map-reduce library was implemented. We want the map-reduce functionality to be as easy to use as the standard collection functions, like \lstinline|map| or \lstinline|filter|. To a high degree this can be achieved by enriching libraries, a process similar to defining type classes in Haskell (see \cite{odersky2006pimp} for details).
+Using the developed aggregators, a map-reduce library was implemented. We want the map-reduce functionality to be as easy to use as the standard collection functions like \lstinline|map| or \lstinline|filter|. To a high degree this can be achieved by enriching libraries, a process similar to defining type classes in Haskell (see \cite{odersky2006pimp} for details).
 
 Using again the generic design of the collections library and type inference allows us to write map-reduce by only specifying the expected result type. The full implementation is shown in listing \ref{lst:map-reduce}. Our first implementation defined \lstinline|def mapReduce[ResultColl,ResultElem](f: Elem => ResultElem)|. Unfortunately it is not possible in Scala to provide some of the type parameters but have others inferred. This forced us to repeat the return type of the function when specifying the result type of the \lstinline|mapReduce| call. Introducing the intermediate \lstinline|MapReducer| object solved this problem. The result type of mapReduce was specified on the call, but the return type of the function could be inferred for the \lstinline|apply| call. Because parentheses can be omitted when a function has no arguments, this resulted in a syntax identical to a case without the intermediate object, but with one less type parameter. A word count example similar to one L\"ammel gives now looks like:
 \begin{lstlisting}
@@ -314,9 +312,9 @@ val prodOfWordLengths = words.mapReduce( w => w.size )(ProductMonoid)
 \end{lstlisting}
 As you can see the result type is not required, because it is inferred from the aggregator.
 
-This fully implements the Sawzall map-reduce model as it is formalized in \cite{lammel2008google}. The use of aggregators instead of monoids, gives us even more freedom in the output of our map functions than L\"ammel's model does. The integration with the Scala collections library makes using map-reduce very easy for programmers used to that idiom.
+This fully implements the Sawzall map-reduce model as it is formalized in \cite{lammel2008google}. The use of aggregators instead of monoids gives us even more freedom in the output of our map functions than L\"ammel's model does. The integration with the Scala collections library makes using map-reduce very easy for programmers used to that idiom.
 
-With all the pieces in place, we can write our processing steps from section \ref{sec:data} in Scala:
+With all pieces in place, we can write our processing steps from section \ref{sec:data} in Scala:
 \begin{lstlisting}
 val commits: List[Commit] = ...
 def projectsToPairs(ps: List[Project]): List[(Project,Project)] = ...
@@ -406,32 +404,45 @@ Below here, the runtime stats per step, + explanation about the speedup + graph
 
 \section{Visualization in the browser with D3}\label{sec:visualization}
 
-Finally, when the data has been computed to links between projects, we need a way to show this data. The objective is to provide a clear way of showing the relation between projects on github. Therefore we want to show a clear overview on how different projects are linked to each other. Also we both want to show the degree of a project (how many other projects is it linked to), and the weight of the link between a project (of how many common contributors does the link consist). Therefore we chose to use a force-directed graph, and show the degree of the project as node-size and the weight of a project in the thickness of a link. This way the force-algorithm will automatically group related projects close together in clusters. In order to get a good overview the navigation over the graph is also very important. In order to browse trough the graph, the graph also needs to be zoomable and navigable.
+Finally, when the data has been computed to links between projects, we need a way to show this data. The objective is to provide a clear way of showing the links between projects on GitHub. We also want to show the weight of a project and the weight of a link between projects. When projects are connected, they should appear close to each other, so community structures become visible.
 
-After some investigation into available tools we found a tool called "Data Driven Documents", in short D3 \footnote{Website: \url{http://d3js.org}}. D3 is a general visualisation library written in javascript, using SVG for the visualisation. D3 includes the "Force Layout", which builds a force directed graph. For the dataset D3 requires a set of Nodes (in our case, projects) and a set of links (thus the project links), which can be passed as JSON document. It also allows to pass a value for the degree and weight for both the projects and the project-links. With some customisation of the style the graphs shown below is obtained \todo{Toevoegen referentie naar graph}
-
-As can be seen in \todo{figure reference} the different project groups are very clearly shown, which provides very interesting results for future investigation. The navigation over the entire graph can easily be done by dragging with the mouse over the graph, and zooming in and out with the mouse wheel.
-
+Therefore we choose to use a force-directed graph. The different properties of our graph are visualized as following:
 \begin{itemize}
-    \item What did we want to show?
-    \item How did we implement it (D3, what graph parameters)
-    \item How did we emphasize characteristics (e.g. central projects)
-    \item An example result
+    \item Nodes repulse each other, but links have a length that keeps their nodes together. Linked projects will show up close to each other and form clusters.
+    \item Project weight is used as the node radius.
+    \item Link weight is used as the edge width.
 \end{itemize}
+In order to get a good overview the navigation over the graph is also very important. In order to browse through the graph, zoom and pan operations must be supported.
 
-\section{Conclusions and further research}\label{sec:conclusions}
+The "Data Drive Documents" (aka D3\footnote{\url{http://d3js.org}}) JavaScript library provided the functionality that we needed. The library uses SVG for rendering, includes a force-directed graph layout and out-of-the-box navigation actions. The library takes a list of nodes (our projects with their weights) and a list of links (with their weights) as input for the graph. The project weight is used for the node radius, the link weight for the edge width. This results in a graph as shown in figure \ref{fig:d3-graph}.
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=\textwidth]{d3-graph}
+    \caption{The project link graph visualized with D3}
+    \label{fig:d3-graph}
+\end{figure}
+
+\section{Conclusions and suggestions}\label{sec:conclusions}
+
+\subsection{Conclusions}
+
+We successfully implement an interactive system to explore the project relations in our GitHub data set.
+
+We implemented the Sawzall aggregator model as described by L\"ammel in Scala. Our implementation is more liberal then the presented one because of the use of aggregators instead of Monoids on every level of nested types. The resulting library and the integration with the Scala collections allow us to specify data processing in a very clean and elegant way.
+
+By using Akka the computation can be distributed over multiple actor systems running on different machines. The distributed system is also scalable, ensuring that when the data size increases the system can be scaled along. We expect the distribution will have a positive effect on the responsiveness of the system, so that users can interactively query the data with different parameters without having to wait too long for the result.
+
+With D3 as graphical library and the force directed graph, projects can be clustered together based on their links, giving a clear overview of the relation between the projects. D3 also allows easy navigation and zooming over large graphs.
+
+\subsection{Suggestions}
+
+Based on our experience we offer the following suggestions for future research and development:
 
 \begin{itemize}
-    \item Did it work
-    \item Is it responsive?
-    \item Did we show interesting things
-    \item What more interesting things could fit in this framework?
-\end{itemize}
-
-We believe the given approach can be easily adapted to include other parameters or show other relations in the data.
-
-\begin{itemize}
-    \item Optimization by only considering weeks
+    \item We believe the data-processing approach as well as the visualisation library can be easily adapted for visualising other aspects of the data. It would be interesting to see this happen.
+    \item It is also interesting to look at the relations of a single project. Filtering the graph for nodes that can be reached from the initial project can show the network of the project evolves over time.
+    \item When the parameters are changed, the whole graph is rebuild. An approach where the graph is morphed to its new shape would be better to show evolution of networks and clusters in time.
 \end{itemize}
 
 \bibliographystyle{abbrvnat}
