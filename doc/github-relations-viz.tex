@@ -329,22 +329,22 @@ val linkMap =
 \end{lstlisting}
 
 \section{Distributed data-processing with Akka}\label{sec:distributed}
-
-Even tough the computation of the project links has been optimised, still a lot of data needs to be processed. Our dataset consisted of 21 million tweets \todo{valideren of dit klopt}. Because of this a request on a set of project links for a given time-interval and weight could take multiple minutes to compute. Such long waiting times are not acceptable, so we decided to distribute the computation over different machines by using actors. Because the system was built in Scala, the most logical choice for this is using the akka toolkit, which is as far as we know the only available actor toolkit for scala.
+Even tough the computation of the project links has been optimised, still a lot of data needs to be processed. Our dataset consisted of 14 million commits. Because of this a request on a set of project links for a given time-interval and weight could take multiple minutes to compute. Such long waiting times are not acceptable, so we decided to distribute the computation by using actors. Because the system was built in Scala, the most logical choice for this is using the Akka toolkit, which is as far as we know the only available actor toolkit for Scala.
 
 \subsection{Akka}
 
-Akka is a toolkit for, as they state themselves, "building highly concurrent, distributed event driven applications". You can both use akka with Java and Scala, but in our opinion it integrates a lot better with scala. The way akka allows distribution is by using "actors" and "futures". In akka you can very easily create actors on multiple systems, pass references of actors to each other and send messages between actors. When configured properly each actor is "network aware", meaning that you can pass a reference from one system to another while the reference stays working
+Akka is a toolkit for, as they state themselves, "building highly concurrent, distributed event driven applications". You can both use akka with Java and Scala, but in our opinion it integrates a lot better with Scala. The main parts in Akka that were used for the distribution were the "Actors" and "Futures". In Akka you can very easily create actors on multiple systems, pass references of actors to other systemsand send messages between actors. When configured properly each actor reference is "network aware", meaning that you can pass a reference from one system to another while the reference remains intact.
 
-With the actor system from akka Futures become very useful. One can "ask" an actor a specific request, and store the result in a future. A future is a monad, which means operations can de done over the future while the result is still being processed by a different actor. \todo{Is this a correct way of explaining it?} Then finally one can pipe the result of the future to an actor, so when the actor which was asked the request fires its result, the operations done over the future monad are executed and the result is sent as a message to the actor it was piped to. What akka actually did behind the scenes was creating another actor, which reacted on the "reply message", computed the operations that were done on the future, and send the result to the actor the future was piped to. This will be explained more clearly with images further in this section.
+With these actors "Futures" become very useful. One can "ask" an actor a specific request, and store the result in a future. A future is a monad, which means operations can de mapped over the future while the result is still being processed by a different actor. \todo{Is this a correct way of explaining it?} Then finally one can pipe the result of the future to another actor, so when the actor which was asked the request fires its result, the operations mapped over the future monad are executed and the result is sent as a message to the actor it was piped to. What Akka actually did behind the scenes was creating another actor, which reacted on the "reply message", computed the operations that were done on the future, and send the result to the actor the future was piped to. This can also be seen in \ref{fig:actor_seq}, which will be explained later.
 
 \subsection{Distribution}
 
-In order to reduce the total computation time by distributing the data over multiple actors, the data needs to be cut into multiple parts. Simply cutting the dataset in multiple pieces is not possible in this case. A link between a project is defined as a "common committer". By splitting the dataset and computing one for example one half on one actor and the other half on a second actor could cause these common commits. 
+In order to reduce the total computation time by distributing the data over multiple actors, the data needs to be cut into multiple parts. Simply cutting the dataset in multiple pieces is not possible in this case. A link between a project is defined as a "common committer". By splitting the dataset and computing one for example one half on one actor and the other half on a second actor could cause these common commits to be broken. 
 
-Therefore we came up with the following better solution. We initially give each actor system access to the entire dataset. Then, when an computation-actor is created, it receives a set of users for whose commits it is responsible. This set of users we defined by taking the remainder of a modulo operation on the userid. With a set of user's the actor can now compute the entire process towards the project links, except for the filtering on the weight of the link. For that last operation an actor needs to be sure that it has all links between a project in order to be sure the result is correct, for which it would also the commits from the other users.
 
-A disadvantage is that booting up the system does not have any speedup, or is even slower when reading from the same datasource, because every actor needs to read all commits in order to select the commits based on the users it is responsible for. This however does not influence the response time, because the system is only booted once after which the user's commits are kept in the memory of the actors. Finally once the actors respond to the request, they send all the project links they computed. The actor that requested the project links receives them and a reduction is done, after which the filter operation over the weight can be done.
+Therefore we came up with the following solution. We initially give each actor system access to the entire dataset. Then, when an computation-actor is created, it receives a set of users for whose commits it is responsible. This set of users we defined by taking the remainder of a modulo operation on the userid. With a set of user's the actor can now compute the entire process towards the project links, except for the filtering on the weight of the link. For that last operation an actor needs to be sure that it has all links between a project in order to be sure the result is correct, for which it would also the commits from the other users.
+
+A disadvantage is that booting up the system does not have any speedup, or is even slower when reading from the same datasource, because every actor needs to read all commits in order to select the commits based on the users it is responsible for. This however does not influence the response time, because the system is only booted once after which the user's commits are kept in the memory of the computation actors. Finally once the actors respond to the request, they send all the project links they computed to the actor that sent the request (using the "Ask" pattern). The actor that requested the project links receives them and a reduction is done, after which the filter operation over the weight can be done.
 
 The result is the simple system below
 
@@ -355,17 +355,19 @@ The result is the simple system below
     \label{fig:actor_sample}
 \end{figure}
 
-This is not sufficient yet. Everything is an actor, so there needs to be an actor for all tasks. For this we add two more actors. One actor is the "web service" actor. This actor handles the requests, which in our case is only "showProjectLinks(interval, weight)". The last actor is the "JSONConvertActor". This actor is responsible for converting the result of the computation actor into a JSON format, which can be handled by the display part. This JSON result is then sent to the user.
 
-So what happens now when a request is described below, and can be seen in \ref{fig:actor_seq}
+As can be seen in the figure, two more actors were also added in this figure. These are actors that handle communication with the user. The "WebserviceActor" is an actor that receives requests from the user, then creates a future for the LinkResults which are requested from the LinkCombinerActor, and pipes the result to the JSONConverterActor. When the JSONConverterActor receives a list of project links, it will convert them to a JSON format for D3, and send the JSON code to the user. The entire communication flow when a LinkRequest is done cis shown in \ref{fig:actor_seq}
 
-\begin{itemize}
-	\item{An user requests a projectLinkJSON for an interval and weight}
-	\item{The Webservice actor receives this request sends an asks request to the LinkCombinerActor. The resulting future is then piped to the JSONConverterActor.}
-	\item{The LinkCombinerActor receives the request from the ProjectLinkMaster, and then asks the project links from all Compute actors it knows they exist. The resulting list of futures is sequence, resuling in a future of a list of project links. On this monad a reduce operation is qeued, and the result is piped to the sender of the request}
-	\item{The Compute actors receive a request to compute projectlinks, which they do, and send the result back to the sender of the message}
-	\item{Now all the futures and pipeto's are in place, at some point the JSONConverterActor will receive a ProjectLinkMessage. This message contains the project links, which it will transform into JSON and then send the result to the user}
-\end{itemize}
+%So what happens now when a request is described below, and can be seen in \ref{fig:actor_seq}
+
+%\begin{itemize}
+%	\item{An user requests a projectLinkJSON for an interval and weight}
+%	\item{The Webservice actor receives this request sends an asks request to the LinkCombinerActor. The resulting future is then piped to the JSONConverterActor.}
+%	\item{The LinkCombinerActor receives the request from the ProjectLinkMaster, and then asks the project links from all Compute actors it knows they exist. The resulting list of futures is sequence, resuling in a future of a list of project links. On this monad a reduce operation is qeued, and the result is piped to the sender of the request}
+%	\item{The Compute actors receive a request to compute projectlinks, which they do, and send the result back to the sender of the message}
+%	\item{Now all the futures and pipeto's are in place, at some point the JSONConverterActor will receive a ProjectLinkMessage. This message contains the project links, which it will transform into JSON and then send the result to the user}
+%\end{itemize}
+
 
 \begin{figure}[htb]
     \centering
