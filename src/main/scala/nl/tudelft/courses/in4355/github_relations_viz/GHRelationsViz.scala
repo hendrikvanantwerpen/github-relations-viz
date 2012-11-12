@@ -11,25 +11,36 @@ import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Logger._
 import scala.collection.parallel.ParMap
 
-class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: Int) {
+class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl: URL, period: Int) {
   import GHRelationsViz._
 
   println( "Reading projects" )
   val projects =
-    getLines(projectsurl)
-      .mapReduce[Map[Int,String]]( parseStringToIntString(_) toList )
+    (Map.empty[ProjectRef,Project] /: getLines(projectsurl)) { (m,l) => 
+      parseStringToProject(l).map( m + _ ).getOrElse( m ) 
+    }
   
   println( "Reading users" )
   val users =
-    getLines(usersurl)
-      .mapReduce[Map[Int,String]]( parseStringToIntString(_) toList )
-    
+    (Map.empty[UserRef,User] /: getLines(usersurl)) { (m,l) => 
+      parseStringToUser(l).map( m + _ ).getOrElse( m )
+    }
+
+  println( "Reading forks" )
+  val forks =
+    getLines(forksurl)
+      .mapReduce[Set[ProjectRef]] { l =>
+        parseStringToFork(l).map( _.projectId ).toList
+      }
+  
   println( "Reading commits" )
   val commits =
     getLines(commitsurl)
-      .mapReduce[Map[Int,Set[Commit]]] { l => 
-        val c = parseStringToBinnedCommit(period)(l)
-        c.filter( c => c.timestamp != 0 ).map( c => (c.timestamp,c) )
+      .mapReduce[Map[Int,Set[(UserRef,ProjectRef)]]] { l => 
+        val c = parseStringToCommit(l)
+        c.filter( c => c.timestamp != 0 )
+         .filter( c => !forks.contains(c.projectId) )
+         .map( c => (getBinnedTime(period)(c.timestamp),(c.userId,c.projectId)) )
          .toList
       }
 
@@ -48,7 +59,7 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
       .par.filter( e => e._1 >= from && e._1 <= until )
       .seq.values.flatten
       .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
-      .par.mapReduce[Map[Int,Set[Int]]](groupProjectByUser)
+      .par.reduceTo[Map[Int,Set[Int]]]
       .values
       .log( psets => println( "Reducing %d project sets to link map".format(psets.size) ) )
       .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
@@ -67,7 +78,9 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, commitsurl: URL, period: I
       projectMap.keySet.toList
     val d3nodes =
       involvedProjects
-        .par.map( p => D3Node(p,projects.get(p).getOrElse("Unknown project with id %d".format(p)),projectMap.get(p).getOrElse(1)) )
+        .par.map( p => D3Node(p,
+                              projects.get(p).map( p => p.name ).getOrElse("Unknown project id %d".format(p)),
+                              projectMap.get(p).getOrElse(1)) )
     val d3links =
       links
         .par.map( t => D3Link( involvedProjects.indexOf(t._1.pId1), involvedProjects.indexOf(t._1.pId2), t._2 ) )
@@ -82,41 +95,56 @@ object GHRelationsViz {
   val epoch1990 = 631148400
   val epoch2015= 1420066800  
   
-  private val TReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
-  
   def getLines(url: URL) =
     scalax.io.Resource.fromURL(url)
                       .lines()
+                      .filter( l => !l.isEmpty && !l.startsWith("#") )
 
-  private val IntStringReg = """([^ ]+) ([^ ]+)""".r  
-  def parseStringToIntString(str: String) = {
+  private val ProjectReg = """([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]*)""".r  
+  def parseStringToProject(str: String) = {
     try {
-      val IntStringReg(id, name) = str
-      Some( id.toInt -> name  )
+      val ProjectReg(id, ownerId, name, language, description) = str
+      Some( id.toInt -> Project(id.toInt, name, language, description) )
     } catch {
-      case _ => None
+      case _ => { println( "Cannot parse to Project: "+str ); None }
     }
   }  
 
-  private val CommitReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r  
-  def parseStringToBinnedCommit(period: Int)(str: String) = {
+  private val UserReg = """([^\t]+)\t([^\t]*)\t([^\t]+)""".r
+  def parseStringToUser(str: String) = {
+    try {
+      val UserReg(id, name, login) = str
+      Some( id.toInt -> User(id.toInt, login, name) )
+    } catch {
+      case _ => { println( "Cannot parse to User: "+str ); None }
+    }
+  }
+  
+  private val CommitReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r
+  def parseStringToCommit(str: String) = {
     try {
       val CommitReg(pId, pName, uId, uName, ts) = str
-      val t = getBinnedTime(period)(ts.toInt)
-      Some( Commit(pId.toInt,uId.toInt,t) )
+      Some( Commit(pId.toInt,uId.toInt,ts.toInt) )
     } catch {
-      case _ => None
+      case _ => { println( "Cannot parse to Commit: "+str ); None }
+    }
+  }
+
+  private val ForkReg = """([^\t]*)\t([^\t]*)""".r
+  def parseStringToFork(str: String) = {
+    try {
+      val ForkReg(projectId, parentId) = str
+      Some( Fork(projectId.toInt, parentId.toInt) )
+    } catch {
+      case _ => { println( "Cannot parse to Fork: "+str ); None }
     }
   }  
-    
+  
   def getBinnedTime(period: Int)(time: Int) =
     time - (time % period)
   
-  def groupProjectByUser(c: Commit) =
-    (c.userId,c.projectId)
-
   def projectsToLinks(ps: Set[Int]) = {
-    createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) ) 
+    createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) )
   }
     
   def createProduct[A](as: Set[A]): Set[(A,A)] =
