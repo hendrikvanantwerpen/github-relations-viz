@@ -63,53 +63,43 @@ object GHRelationsStats extends App {
     result
   }
 
-  val commitlines = getLines(commitsurl)
-  val projectlines = getLines(projectsurl)
-  val userlines = getLines(usersurl)
-  val forklines = getLines(forksurl)
   val logger = new TeeWriter(new FileWriter(logfile))
 
   logger.write("Starting statistics calculation")
   logger.writeln("")
 
-  logger.writeln("Build project map")
-  val projects = timed("reading",logger.writeln) {
-    (Map.empty[ProjectRef,Project] /: getLines(projectsurl)) { (m,l) => 
-      parseStringToProject(l).map( m + _ ).getOrElse( m ) 
-    }
-  }
-  logger.writeln("Found %d projects".format(projects.size) )
-  
   logger.writeln("Build user map")
   val users = timed("reading",logger.writeln) {
-    (Map.empty[UserRef,User] /: getLines(usersurl)) { (m,l) => 
-      parseStringToUser(l).map( m + _ ).getOrElse( m )
-    }
+    readUsers(usersurl)
   }
+  def userResolv(id: UserRef) = users.get(id).getOrElse(User.unknown(id))
   logger.writeln("Found %d users".format(users.size) )
 
+  logger.writeln("Build project map")
+  val projects = timed("reading",logger.writeln) {
+    readProjects(projectsurl)
+  }
+  def projectResolv(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
+  logger.writeln("Found %d projects".format(projects.size) )
+  
   logger.writeln("Read forks")
   val forks = timed("reading",logger.writeln) {
-    getLines(forksurl)
-      .mapReduce[Set[ProjectRef]] { l =>
-        parseStringToFork(l).map( _.projectId ).toList
-      }
+    readForks(forksurl)
   }
   logger.writeln("Found %d forks".format(forks.size) )
   
   logger.writeln("Read commits to timeindexed Map")
   val (total,bcm) = timed("reading",logger.writeln) {
-    getLines(commitsurl)
-      .mapReduce[(Int,Map[Int,Set[(UserRef,ProjectRef)]])] { l => 
-        val c = parseStringToCommit(l)
-        c.filter( c => c.timestamp != 0 &&
-                  c.timestamp >= FROM &&
-                  c.timestamp <= TO &&
-                  !forks.contains(c.projectId) )
-         .map { c => 
-           (1,(getBinnedTime(PERIOD)(c.timestamp),(c.userId,c.projectId))) 
-         }
-         .toList
+    readCommits(commitsurl)
+      .mapReduce[(Int,Map[Int,Set[(UserRef,ProjectRef)]])] { c =>
+        Some(c).filter( c => c.timestamp != 0 &&
+                             c.timestamp >= FROM &&
+                             c.timestamp <= TO &&
+                             !forks.contains(c.project) )
+               .map { c => 
+                  (1,(getBinnedTime(PERIOD)(c.timestamp),(c.user,c.project))) 
+                }
+               .toList
       }
   }
   val n = (0 /: bcm)( _ + _._2.size )
@@ -126,7 +116,7 @@ object GHRelationsStats extends App {
   logger.writeln("Kept %d user-project links after time filter".format(fcs.size) )
   
   val ups = timed("group projects by user",logger.writeln) {
-    fcs.par.reduceTo[Map[Int,Set[Int]]]
+    fcs.par.reduceTo[Map[UserRef,Set[ProjectRef]]]
   }
   
   val projectsPerUserHist = ups.par.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )

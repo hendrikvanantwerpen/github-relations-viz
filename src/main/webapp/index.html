@@ -11,28 +11,30 @@
   <body>
     <div id="graph">
     </div>
-    <br />
-    <div><span>From: </span><span id="date-from"></span></div>
-    <div><span>To: </span><span id="date-to"></span></div>
-    <br />
-    <div id="date-range-slider"></div>
-    <br />
-    <div><span>Minimum weight: </span><span id="min-weight"></span></div>
-    <br />
-    <div id="min-weight-range-slider"></div>
-    <br />
-    <div id="statusdiv"><span id="labelID">Status: </span><span id="statusLabel">ready</span></div>
-    <br/>
-    <button id="refresh">Refresh graph</button>
-      <div id="pop-up">
-        <div id="pop-up-title"></div>
-          <div id="pop-up-content">
-            <table> <tr>
-              <td><div id="pop-img"></div></td>
-              <td><div id="pop-desc"></div></td>
-            </tr> </table>
-          </div>
-        </div>
+    <div class="">
+    	<div class="leftColumn">
+    		<div id="languages"></div>
+    	</div>
+    	<div class="rightColumn">
+            <div><span class="label">From</span><span id="date-from"></span></div>
+            <div><span class="label">Until</span><span id="date-to"></span></div>
+            <br />
+            <div id="date-range-slider"></div>
+            <br />
+            <div><span class="label">Min link value</span><span id="min-link-value"></span></div>
+            <br />
+            <div id="min-link-value-slider"></div>    
+    	</div>
+    </div>    
+    <div class="clearer"></div>
+    <div id="statusdiv"><span class="label">Nodes: </span><span id="visibleNodesLabel">0</span></span>/<span id="totalNodesLabel">0</span></div>
+    <div id="statusdiv"><span class="label">Links: </span><span id="visibleLinksLabel">0</span>/<span id="totalLinksLabel">0</span></div>
+    <div id="statusdiv"><span class="label">Status: </span><span id="statusLabel">starting</span></div>
+    <div id="pop-up" style="display:hidden;">
+      <div id="pop-up-title"></div>
+      <div id="pop-up-content">
       </div>
+      </div>
+    </div>
   </body>
 </html>

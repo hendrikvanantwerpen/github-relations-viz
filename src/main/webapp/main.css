@@ -3,6 +3,38 @@
     height: 65%;
 }
 
+.leftColumn {
+	clear: left;
+	float: left;
+	width: 25%;
+}
+.rightColumn {
+	clear: right;
+	float: right;
+	width: 75%;
+}
+
+.clearer {
+	clear: both;
+}
+
+.label {
+	display: inline-block;
+	width: 100px;
+}
+
+.langButton .ui-button-text {
+	padding: 0px;
+}
+
+.langButton {
+	font-family: inherit;
+	font-weight: inherit;
+	font-size: 100%;
+	padding: 5px;
+	background-color: #bbb;
+}
+
 circle.node {
     fill: #f55;
     stroke: #fff;
@@ -31,10 +63,4 @@ div#pop-up-title {
 }
 div#pop-up-content {
     font-size: 12px;
-}
-div#pop-desc {
-}
-div#pop-img {
-    font-size: 30px;
-    font-weight: bolder;
 }

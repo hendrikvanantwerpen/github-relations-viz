@@ -4,7 +4,6 @@ import java.net.URL
 import java.util.Date
 import scala.io.Source
 import scala.util.matching.Regex
-import D3Entities._
 import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
@@ -14,43 +13,28 @@ import scala.collection.parallel.ParMap
 class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl: URL, period: Int) {
   import GHRelationsViz._
 
-  println( "Reading projects" )
-  val projects =
-    (Map.empty[ProjectRef,Project] /: getLines(projectsurl)) { (m,l) => 
-      parseStringToProject(l).map( m + _ ).getOrElse( m ) 
-    }
-  
   println( "Reading users" )
-  val users =
-    (Map.empty[UserRef,User] /: getLines(usersurl)) { (m,l) => 
-      parseStringToUser(l).map( m + _ ).getOrElse( m )
-    }
-
+  val users = readUsers(usersurl)
+  def getUser(id: UserRef) = users.get(id).getOrElse(User.unknown(id))
+  
+  println( "Reading projects" )
+  val projects = readProjects(projectsurl)
+  def getProject(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
+  
   println( "Reading forks" )
-  val forks =
-    getLines(forksurl)
-      .mapReduce[Set[ProjectRef]] { l =>
-        parseStringToFork(l).map( _.projectId ).toList
-      }
+  val forks = readForks(forksurl)
   
   println( "Reading commits" )
-  val commits =
-    getLines(commitsurl)
-      .mapReduce[Map[Int,Set[(UserRef,ProjectRef)]]] { l => 
-        val c = parseStringToCommit(l)
-        c.filter( c => c.timestamp != 0 )
-         .filter( c => !forks.contains(c.projectId) )
-         .map( c => (getBinnedTime(period)(c.timestamp),(c.userId,c.projectId)) )
-         .toList
-      }
-
-  println( "Calculating limits" )
-  val limits = Range(epoch1990,epoch2015)
-      //(Int.MaxValue /: commits.keySet)( (a,ts) => math.min(a,ts) ),
-      //(Int.MinValue /: commits.keySet)( (a,ts) => math.max(a,ts) )
-  //)
+  val commits = readCommits(commitsurl)
+    .mapReduce[Map[Int,Set[(UserRef,ProjectRef)]]] { c =>
+      Some(c).filter( c => c.timestamp != 0 )
+     	     .filter( c => !forks.contains(c.project) )
+     	     .map( c => (getBinnedTime(period)(c.timestamp),(c.user,c.project)) )
+     	     .toList
+     }
   
-  def getLimits = limits
+  println( "Calculating limits" )
+  val limits = Range(epoch1990,epoch2015,period)
   
   def getProjectLinks(from: Int, until: Int, minWeight: Int) = {
     Timer.tick
@@ -60,35 +44,13 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl:
       .par.filter( e => e._1 >= from && e._1 <= until )
       .seq.values.flatten
       .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
-      .par.reduceTo[Map[Int,Set[Int]]]
+      .par.reduceTo[Map[UserRef,Set[ProjectRef]]]
       .values
       .log( psets => println("Done reducing 1 in %d, Reducing %d project sets to link map".format(Timer.tick, psets.size) ) )
       .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
       .log( lm => println( "Done reducing 2 in %d, Filter %d links by weight".format(Timer.tick, lm.size) ) )
       .filter( _._2 >= minWeight )
       .log(cs => println("Done filtering in %d".format(Timer.tick)))
-  }
-  
-
-  def getD3Data(from: Int, until: Int, minWeight: Int) = {
-    val links = 
-      getProjectLinks(from, until, minWeight)
-    println( "Convert project links to D3 data" )
-    val projectMap =
-      links
-        .par.mapReduce[Map[Int,Int]]( t => linksToProjects(t._1).map( p => (p,1) ) )
-    val involvedProjects =
-      projectMap.keySet.toList
-    val d3nodes =
-      involvedProjects
-        .par.map( p => D3Node(p,
-                              projects.get(p).map( p => p.name ).getOrElse("Unknown project id %d".format(p)),
-                              projectMap.get(p).getOrElse(1)) )
-    val d3links =
-      links
-        .par.map( t => D3Link( involvedProjects.indexOf(t._1.pId1), involvedProjects.indexOf(t._1.pId2), t._2 ) )
-    println( "Return D3 graph" )
-    D3Graph(d3nodes.seq,d3links.seq)
   }
   
 }
@@ -103,25 +65,43 @@ object GHRelationsViz {
                       .lines()
                       .filter( l => !l.isEmpty && !l.startsWith("#") )
 
+  def notNULL(s: String) = {
+    if ( s.toLowerCase == "null" ) "" else s
+  }
+
+  def readUsers(url: URL) =
+    (Map.empty[UserRef,User] /: getLines(url)) { (m,l) => 
+      parseStringToUser(l).map( m + _ ).getOrElse( m )
+    }
+  
   private val ProjectReg = """([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]*)""".r  
   def parseStringToProject(str: String) = {
     try {
       val ProjectReg(id, ownerId, name, language, description) = str
-      Some( id.toInt -> Project(id.toInt, name, language, description) )
+      Some( id.toInt -> Project(id.toInt, ownerId.toInt, notNULL(name), notNULL(language), notNULL(description)) )
     } catch {
       case _ => { println( "Cannot parse to Project: "+str ); None }
     }
   }  
 
+  def readProjects(url: URL) =
+    (Map.empty[ProjectRef,Project] /: getLines(url)) { (m,l) => 
+      parseStringToProject(l).map( m + _ ).getOrElse( m )
+    }
+  
   private val UserReg = """([^\t]+)\t([^\t]*)\t([^\t]+)""".r
   def parseStringToUser(str: String) = {
     try {
       val UserReg(id, name, login) = str
-      Some( id.toInt -> User(id.toInt, login, name) )
+      Some( id.toInt -> User(id.toInt, notNULL(login), notNULL(name)) )
     } catch {
       case _ => { println( "Cannot parse to User: "+str ); None }
     }
   }
+  
+  def readCommits(url: URL) = 
+    getLines(url)
+      .flatMap( parseStringToCommit )
   
   private val CommitReg = """([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)""".r
   def parseStringToCommit(str: String) = {
@@ -133,6 +113,12 @@ object GHRelationsViz {
     }
   }
 
+  def readForks(url: URL) =
+    getLines(url)
+      .mapReduce[Set[ProjectRef]] { l =>
+        parseStringToFork(l).map( _.project ).toList
+      }    
+  
   private val ForkReg = """([^\t]*)\t([^\t]*)""".r
   def parseStringToFork(str: String) = {
     try {
@@ -146,7 +132,7 @@ object GHRelationsViz {
   def getBinnedTime(period: Int)(time: Int) =
     time - (time % period)
   
-  def projectsToLinks(ps: Set[Int]) = {
+  def projectsToLinks(ps: Set[ProjectRef]) = {
     createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) )
   }
     
@@ -154,11 +140,5 @@ object GHRelationsViz {
     as.subsets(2)
       .map( s => (s.head,s.tail.head) )
       .toSet
-
-  def linksToProjects(l: Link) =
-    Set(l.pId1,l.pId2)
-  
-  def isActorTask(c: Commit, divisor: Int, remainder: Int) =
-      c.userId%divisor==remainder
 
 }

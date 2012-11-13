@@ -1,12 +1,21 @@
 $(document).ready(function(){
 
+	var UNKNOWN = '[unknown]'
+
+	var minTime = maxTime = 0;
+    var stepTime = 1;
+    var minLinkValue = 1;
+    var selectedlangs = {};
+    var nodes = [];
+    var links = [];		
+		
     $.ajaxSetup({
         cache: false
     });
 
-    var minTime = maxTime = 0
-    var minWeight = 1
-
+    ///////////////////////////////////////
+    // D3 Fisheye
+    
     d3.fisheye = function() {
         var radius = 200,
             power = 2,
@@ -51,214 +60,379 @@ $(document).ready(function(){
       return rescale();
     };
 
-    function updateGraph(nodes,links) {
-        $( "#graph" ).html( "" )
+    ///////////////////////////////////////
+    // D3 Graph
+    
+    var w = $( "#graph" ).width(),
+        h = $( "#graph" ).height(),
+        fill = d3.scale.category20(),
+        trans = [0,0],
+        scale = 1;
+    
+    var langcolor = d3.scale.category20();
+    var langcolormap = {}
+    var langbtnmap = {}
+    var langcntmap = {}
+    function getLangColor(lang) {
+    	var c = langcolormap[lang];
+    	if ( !c ) {
+    		c = langcolor(lang);
+    		langcolormap[lang] = c;
+			selectedlangs[lang] = true;
+    		var btn = $('<div/>',{
+    			class: 'langButton',
+    			style: 'background: '+c+';'
+    		}).button({
+    			"label": lang || UNKNOWN
+    		}).appendTo( "#languages" )[0];
+    		langbtnmap[lang] = btn;
+    		$( btn ).click(function(e){
+    			if ( selectedlangs[lang] ) {
+    				$( btn ).css( "background", "inherit" );
+        			selectedlangs[lang] = false;
+    			} else {
+    				$( btn ).css( "background", c );
+        			selectedlangs[lang] = true;
+    			}
+    			updateGraph();
+    		});
+    	}
+    	return c;
+    }
+    function setLangCount(lang,count) {
+    	langcntmap[lang] = count;
+    	$( langbtnmap[lang] ).button( "option", "label", (lang || UNKNOWN) + " (?/" + count + ")" );
+    }
+    function setLangViewCount(lang,viewcount) {
+    	var count = langcntmap[lang];
+    	$( langbtnmap[lang] ).button( "option", "label", (lang || UNKNOWN) + " ("+viewcount+"/" + count + ")" );
+    }
 
-        var w = $( "#graph" ).width(),
-            h = $( "#graph" ).height(),
-            fill = d3.scale.category20(),
-            trans = [0,0]
-            scale = 1;
+    var fisheye = d3.fisheye()
+                    .radius(100)
+                    .power(3);
 
-        var fisheye = d3.fisheye()
-                        .radius(100)
-                        .power(3);
+    var vis = d3.select("#graph")
+                .append("svg:svg")
+                .attr("width", w)
+                .attr("height", h)
+                .attr("pointer-events", "all")
+                .append('svg:g')
+                .call(d3.behavior.zoom().on("zoom", onzoom ))
+                .append('svg:g');
+    
+    var background = vis.append('svg:rect')
+                        .attr('width', w)
+                        .attr('height', h)
+                        .attr('fill', 'white');
 
-        var vis = d3.select("#graph")
-                    .append("svg:svg")
-                    .attr("width", w)
-                    .attr("height", h)
-                    .attr("pointer-events", "all")
-                    .append('svg:g')
-                    .call(d3.behavior.zoom().on("zoom", onzoom ))
-                    .append('svg:g');
+    function onzoom() {
+        scale = d3.event.scale
+        trans = d3.event.translate
+        vis.attr("transform","translate("+trans+")"+" scale("+scale+")");
+        background.attr("transform","translate("+[-trans[0]/scale,-trans[1]/scale]+") scale("+1/scale+")");
+    }
 
-        var background = vis.append('svg:rect')
-                            .attr('width', w)
-                            .attr('height', h)
-                            .attr('fill', 'white');
+    var force = d3.layout.force()
+                  .size([w, h])
+                  .charge(-500)
+                  .linkDistance(function(link){
+                	  var d = link.source.value+link.target.value;
+                	  return 3*d; })
+                  .linkStrength( 0.1 );
 
-        function onzoom() {
-            scale = d3.event.scale
-            trans = d3.event.translate
-            vis.attr("transform","translate("+trans+")"+" scale("+scale+")");
-            background.attr("transform","translate("+[-trans[0]/scale,-trans[1]/scale]+") scale("+1/scale+")");
-        }
+    function updateData(ns,ls) {
+    	updateStatus("updating data")
+    	var nodeIndex = {};
+    	var langHist = {};
+    	
+    	var n;
+    	for (var ni = ns.length-1; ni >=0; ni-- ) {
+    		n = ns[ni];
+    		nodeIndex[n.id] = n;
+    		langHist[n.lang] = (langHist[n.lang] || 0) + 1
+    	}
 
-        var force = d3.layout.force()
-                      .size([w, h])
-                      .nodes(nodes)
-                      .links(links)
-                      .charge(-500)
-                      .linkDistance(function(d) { return 100/d.value; })
-                      .linkStrength(function(d){ return 0.2; });
+    	for (var lang in langHist) {
+    		getLangColor(lang);
+    		setLangCount(lang,langHist[lang]);
+    	}
+    	
+    	var l;
+    	for(var li = ls.length-1; li >=0; li-- ) {
+    		ls[li].source = nodeIndex[ls[li].source];
+    		ls[li].target = nodeIndex[ls[li].target];
+    	}
+    	
+    	nodes = ns;
+    	links = ls;
+    	
+    	$( "#totalNodesLabel" ).html( nodes.length )
+    	$( "#totalLinksLabel" ).html( links.length )
+    	updateStatus("data updated")
+    }
+    
+    function updateGraph() {
+    	updateStatus("updating graph")
+    	force.stop();
+    	
+    	var langHist = {};    	
+    	
+    	var pn;
+    	var possibleNodes = {};
+    	for (var pni = nodes.length-1; pni >= 0; pni--) {
+    		pn = nodes[pni];
+    		langHist[pn.lang] = 0;
+    		if ( selectedlangs[pn.lang] ) {
+    			possibleNodes[pn.id] = true;
+    		}
+    	}
+    	
+        var l;
+    	var includedLinks = [];
+    	var linkedNodes = {};
+    	for (var li = links.length-1; li >= 0; li--) {
+    		l = links[li];
+    		if ( l.value >= minLinkValue &&
+    			 possibleNodes[l.source.id] &&
+    			 possibleNodes[l.target.id] ) {
+				linkedNodes[l.source.id] = l.source;
+				linkedNodes[l.target.id] = l.target;
+    			includedLinks.push(links[li]);
+    		}
+    	}
 
-        var link = vis.selectAll("line.link")
-                      .data(links)
-                      .enter()
-                      .append("svg:line")
-                      .attr("class", "link")
-                      .style("stroke-width", function(d) { return Math.sqrt(d.value); })
-                      .style("stroke", "#CCC")
-                      .attr("x1", function(d) { return d.source.x; })
-                      .attr("y1", function(d) { return d.source.y; })
-                      .attr("x2", function(d) { return d.target.x; })
-                      .attr("y2", function(d) { return d.target.y; })
-                      .on("mouseover", showLinkPopup)
-                      .on("mouseout", hidePopup);
+    	var n;
+    	var includedNodes = [];
+    	for (var ni in linkedNodes) {
+    		n = linkedNodes[ni];
+    		includedNodes.push(n);
+    		langHist[n.lang] = (langHist[n.lang] || 0) + 1
+    	}
+
+    	for (var lang in langHist) {
+    		setLangViewCount(lang,langHist[lang]);
+    	}    	
+    	
+    	$( "#visibleNodesLabel" ).html( includedNodes.length )
+    	$( "#visibleLinksLabel" ).html( includedLinks.length )
+    	
+    	force.nodes(includedNodes)
+    	     .links(includedLinks);
+
+    	var link = vis.selectAll("line.link")
+                      .data(includedLinks, function(l){
+                    	  return  l.source.id+"-"+l.target.id; });
+        
+    	link.enter()
+            .append("svg:line")
+            .attr("class", "link")
+            .style("stroke-width", function(l) { 
+            	return Math.sqrt(l.value); })
+            .style("stroke", "#CCC")
+            .attr("x1", function(l) {
+            	return l.source.x; })
+            .attr("y1", function(l) { 
+            	return l.source.y; })
+            .attr("x2", function(l) { 
+            	return l.target.x; })
+            .attr("y2", function(l) { 
+            	return l.target.y; })
+            .on("mouseover", showLinkPopup)
+            .on("mouseout", hidePopup);
+
+    	link.exit().remove();
 
         var node = vis.selectAll("circle.node")
-                      .data(nodes)
-                      .enter()
-                      .append("svg:circle")
-                      .attr("class", "node")
-                      .attr("cx", function(d) { return d.x; })
-                      .attr("cy", function(d) { return d.y; })
-                      .attr("r", function(d) { return d.weight; })
-                      .on("mouseover", showNodePopup)
-                      .on("mouseout", hidePopup)
-                      .call(force.drag);
+                      .data(includedNodes, function(n){ 
+                    	  return n.id; });
 
-        vis.style("opacity", 1e-6)
-           .transition()
-           .duration(1000)
-           .style("opacity", 1);
+        node.enter()
+            .append("svg:circle")
+            .attr("class", "node")
+            .attr("cx", function(n) { 
+            	return n.x; })
+            .attr("cy", function(n) { 
+            	return n.y; })
+            .attr("r", function(n) { 
+            	return n.value; })
+            .style("fill", function(n) { 
+            	return getLangColor(n.lang); })
+            .on("mouseover", showNodePopup)
+            .on("mouseout", hidePopup)
+            .call(force.drag);
 
-        force.start();
-        //var n = nodes.length;
-        //for (var i = n*n; i > 0; --i) force.tick();
-        //force.stop();
-
-        function showLinkPopup(d) {
-            var x = d3.event.x
-            var y = d3.event.y
-            $("#pop-up").fadeOut(100,function () {
-                // Popup content
-                $("#pop-up-title").html("Link: "+d.source.name+" - "+d.target.name);
-                $("#pop-img").html(d.value);
-                $("#pop-desc").html("contributors");
-                // Popup position
-                var popLeft = x+20;
-                var popTop = y+20;
-                $("#pop-up").css({"left":popLeft,"top":popTop});
-                $("#pop-up").fadeIn(100);
-            });
-        }
-
-        function showNodePopup(d) {
-            $("#pop-up").fadeOut(100,function () {
-                // Popup content
-                $("#pop-up-title").html("Project: "+d.name);
-                $("#pop-img").html(d.weight);
-                $("#pop-desc").html("connected projects");
-                // Popup position
-                var popLeft = (d.x*scale)+trans[0]+20;//lE.cL[0] + 20;
-                var popTop = (d.y*scale)+trans[1]+20;//lE.cL[1] + 70;
-                $("#pop-up").css({"left":popLeft,"top":popTop});
-                $("#pop-up").fadeIn(100);
-            });
-        }
-
-        function hidePopup(d) {
-            $("#pop-up").fadeOut(50);
-            d3.select(this).attr("fill","url(#ten1)");
-        }
+    	node.exit().remove();
 
         vis.on("mousemove", function() {
 
             fisheye.center(d3.mouse(this));
 
-            node.each(function(d) { d.display = fisheye(d); })
-                .attr("cx", function(d) { return d.display.x; })
-                .attr("cy", function(d) { return d.display.y; })
-                .attr("r", function(d) { return d.display.z * d.weight; });
+            node.each(function(n) { n.display = fisheye(n); })
+                .attr("cx", function(n) {
+                	return n.display.x; })
+                .attr("cy", function(n) {
+                	return n.display.y; })
+                .attr("r", function(n) {
+                	return n.display.z * n.value; });
 
-            link.attr("x1", function(d) { return d.source.display.x; })
-                .attr("y1", function(d) { return d.source.display.y; })
-                .attr("x2", function(d) { return d.target.display.x; })
-                .attr("y2", function(d) { return d.target.display.y; });
+            link.attr("x1", function(l) {
+            	return l.source.display.x; })
+                .attr("y1", function(l) {
+                	return l.source.display.y; })
+                .attr("x2", function(l) {
+                	return l.target.display.x; })
+                .attr("y2", function(l) {
+                	return l.target.display.y; });
         });
-
+    	
+    	updateStatus("graph updated")
+        force.start();
     }
 
-  function createUI(minDate,maxDate) {
+    function showLinkPopup(l) {
+        var x = d3.event.x
+        var y = d3.event.y
+    	showPopup("Link: "+l.source.name+" - "+l.target.name,
+  			  [l.value+" common contributors"],
+  			  [x,y]);
+    }
+
+    function showNodePopup(n) {
+    	showPopup("Project: "+n.name,
+    			  [n.desc || "",
+    			   "Language: "+(n.lang || UNKNOWN),
+    			   "Owner: "+(n.owner.name || n.owner.login || UNKNOWN),
+    			   n.value+" connected projects"],
+    			  [n.x,n.y]);
+    }
+
+    function showPopup(title,contents,pos) {
+        $("#pop-up").fadeOut(100,function () {
+            // Popup content
+            $("#pop-up-title").html(title);
+            $("#pop-up-content").html( "" );
+            for (var i = 0; i < contents.length; i++) {
+            	$("#pop-up-content").append("<div>"+contents[i]+"</div>");
+            }
+            // Popup position
+            var popLeft = (pos[0]*scale)+trans[0]+20;
+            var popTop = (pos[1]*scale)+trans[1]+20;
+            $("#pop-up").css({"left":popLeft,"top":popTop});
+            $("#pop-up").fadeIn(100);
+        });
+    }
+    
+    function hidePopup(n) {
+        $("#pop-up").fadeOut(50);
+        d3.select(this).attr("fill","url(#ten1)");
+    }
+
+	///////////////////////////////////////
+	// Settings
+
     $( "#date-range-slider" ).slider({
       range: true,
-      min: minDate,
-      max: maxDate,
+      min: minTime,
+      max: maxTime,
+      step: stepTime,
       values: [ minTime, maxTime ],
       slide: function( event, ui ) {
-          minTime = ui.values[ 0 ];
-          maxTime = ui.values[ 1 ];
-          updateUI();
+    	  updateDates(ui.values);
+      },
+      stop: function( event, ui ) {
+    	  updateDates(ui.values);
+    	  requestGraphData();
       }
     });
+
+    function updateDateLimits(min,max,step) {
+    	$( "#date-range-slider" ).slider( "option", "min", min );
+    	$( "#date-range-slider" ).slider( "option", "max", max );
+    	$( "#date-range-slider" ).slider( "option", "step", step );
+    	minTime = Math.max(min,minTime);
+    	maxTime = Math.min(max,maxTime);
+    }
     
-    $( "#min-weight-range-slider" ).slider({
+    function updateDates(vals) {
+        minTime = vals[ 0 ];
+        maxTime = vals[ 1 ];
+        function fmtEpoch(e) {
+            var day = 24 * 3600;
+            var re = e - (e % day);
+            var d = new Date(1000*re);
+            return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+        }
+        $( "#date-from" ).text( fmtEpoch(minTime) );
+        $( "#date-to" ).text( fmtEpoch(maxTime) );
+    }    
+    
+    updateDates([minTime,maxTime]);
+    
+    $( "#min-link-value-slider" ).slider({
       range: false,
       min: 1,
-      max: 20,
-      values: [ minWeight ],
+      max: 100,
+      value: minLinkValue,
       slide: function( event, ui ) {
-          minWeight = ui.values[0];
-          updateUI();
+    	  updateMinLinkValue(ui.value);
+      },
+      stop: function( event, ui ) {
+    	  updateMinLinkValue(ui.value);
+    	  requestGraphData();
       }
     });
     
-    $( "#refresh" ).button()
-    .click(function(e){
-      refreshGraph();
-      e.preventDefault();
-    });
-  }
+    function updateLinkValueLimit(max) {
+    	$( "#min-link-value-slider" ).slider( "option", "max", max);
+    	minLinkValue = Math.min(max,minLinkValue);
 
-  
-  function updateUI() {
-      function fmtEpoch(e) {
-          var day = 24 * 3600;
-          var re = e - (e % day);
-          var d = new Date(1000*re);
-          return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
-      }
-      $( "#date-from" ).text( fmtEpoch(minTime) );
-      $( "#date-to" ).text( fmtEpoch(maxTime) );
-      $('#min-weight').text( minWeight );
-  }
+    }    
+    
+    function updateMinLinkValue(val) {
+  	  	minLinkValue = val;
+        $('#min-link-value').text( minLinkValue );
+    }
 
-  function updateStatus(msg) {
-      $("#statusLabel").text(msg);
-  }
+    updateMinLinkValue(minLinkValue);
+    
+	///////////////////////////////////////
+	// Query graph    
 
-  var request = null;
-  function refreshGraph() {
-      if(request !== null) {
-          updateStatus("try again later - request in progress");
-      } else {
-        updateStatus('loading...');
-        request = $.getJSON('/d3data?from='+minTime+'&to='+maxTime+'&minWeight='+minWeight)
-        .success(function(json){
-          request = null;
-          if ( !$.isEmptyObject(json) ) {
-            updateStatus('loading json into graph');
-            updateGraph(json.nodes,json.links);
-            updateStatus('graph rendered - ready');
-          } else {
-            updateStatus('empty graph - ready');
-          }
-        })
-        .error(function(){
-         updateStatus('error');
-         request = null;
-       });
-     }
-  }
+    function updateStatus(msg) {
+        $("#statusLabel").text(msg);
+    }
 
-  updateStatus('getting date range');
-  $.getJSON('/range')
-  .success(function(range){
-    minTime = maxTime = range.min
-    createUI(range.min,range.max);
-    updateStatus('ready');
-  });
+    var request = null;
+    function requestGraphData() {
+        if(request !== null) {
+            updateStatus("try again later - request in progress");
+        } else {
+        	updateStatus('loading...');
+        	request = $.getJSON('/d3data?from='+minTime+'&to='+maxTime+'&minWeight='+minLinkValue)
+        	           .success(function(json){
+        	        	    request = null;
+        	        	    if ( !$.isEmptyObject(json) ) {
+        	        	    	updateData(json.nodes,json.links);
+        	        	    	updateGraph();
+        	        	    } else {
+        	        	    	updateStatus('empty graph - ready');
+        	        	    }
+        	            })
+        			   .error(function(){
+        				    updateStatus('error');
+        				    request = null;
+        			    });
+        }
+    }
+
+    updateStatus('getting date range');
+    $.getJSON('/range')
+     .success(function(range){
+        minTime = maxTime = range.min;
+        updateDateLimits(range.min,range.max,range.step);
+        //updateMinLinkValue(maximum range)
+        updateStatus('ready');
+      });
 
 });
