@@ -12,6 +12,7 @@ class SimpleCalculatorActor extends Actor {
     case Subtract(n1, n2) =>
       println("Calculating %d - %d".format(n1, n2))
       sender ! SubtractResult(n1, n2, n1 - n2)
+    
   }
 }
 //#actor
