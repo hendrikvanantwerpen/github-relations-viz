@@ -32,7 +32,7 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl:
      	     .map( c => (getBinnedTime(period)(c.timestamp),(c.user,c.project)) )
      	     .toList
      }
-  
+
   println( "Calculating limits" )
   val limits = Range(epoch1990,epoch2015,period)
   
@@ -41,11 +41,10 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl:
     println( "Calculating project links from %d until %d with minimum weight %d".format(from,until,minWeight) )
     commits
       .log( cs => println( "Filter %d time bins".format(cs.size) ) )
-      .par.filter( e => e._1 >= from && e._1 <= until )
-      .seq.values.flatten
+      .par.filter( e => e._1 >= from && e._1 <= until ).map( kv => kv._2 ).flatten
       .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
-      .par.reduceTo[Map[UserRef,Set[ProjectRef]]]
-      .values
+      .reduceTo[ParMap[UserRef,Set[ProjectRef]]]
+      .map( kv => kv._2 )
       .log( psets => println("Done reducing 1 in %d, Reducing %d project sets to link map".format(Timer.tick, psets.size) ) )
       .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
       .log( lm => println( "Done reducing 2 in %d, Filter %d links by weight".format(Timer.tick, lm.size) ) )
