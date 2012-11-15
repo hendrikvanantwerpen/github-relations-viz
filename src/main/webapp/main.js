@@ -267,18 +267,19 @@ $(document).ready(function(){
 	                .append('svg:g')
 	                .call(d3.behavior.zoom().on("zoom", onzoom ))
 	                
-	    var background = vis.append('svg:rect')
-	                        .attr('width', graphWidth)
-	                        .attr('height', graphHeight)
-	                        .attr('fill', 'white');
+	    var background = vis.append('svg:g')
+                            .append('svg:rect')
+                            .attr('width', graphWidth)
+                            .attr('height', graphHeight)
+                            .attr('fill', 'white');
 	    var linkVis = vis.append('svg:g');
 	    var nodeVis = vis.append('svg:g');
 	
 	    function onzoom() {
 	        graphScale = d3.event.scale
 	        graphTrans = d3.event.translate
-	        vis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
-	        background.attr("transform","translate("+[-graphTrans[0]/graphScale,-graphTrans[1]/graphScale]+") scale("+1/graphScale+")");
+	        nodeVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
+	        linkVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
 	    }
 	
 	    var force = d3.layout.force()
