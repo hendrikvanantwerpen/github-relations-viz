@@ -10,56 +10,15 @@ import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Logger._
 import scala.collection.immutable.SortedMap
 import scala.collection.parallel.ParMap
+import scala.collection.GenMap
+import akka.dispatch.Future
 
-class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl: URL, minFrom: Int, maxUntil: Int, period: Int) {
-  import GHRelationsViz._
-
-  println( "Reading users" )
-  val users = readUsers(usersurl)
-  def getUser(id: UserRef) = users.get(id).getOrElse(User.unknown(id))
-  
-  println( "Reading projects" )
-  val projects = readProjects(projectsurl)
-  def getProject(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
-  
-  println( "Reading forks" )
-  val forks = readForks(forksurl)
-  
-  println( "Reading commits" )
-  val commits = readCommits(commitsurl)
-    .mapReduce[ParMap[Int,Set[(UserRef,ProjectRef)]]] { c =>
-      Some(c).filter( c => c.timestamp >= minFrom &&
-                           c.timestamp <= maxUntil &&
-                           !forks.contains(c.project) )
-             .map( c => (getBinnedTime(period)(c.timestamp),(c.user,c.project)) )
-             .toList
-     }
-
-  println( "Calculating project-user/week histogram" )
-  val userProjectLinksPerWeek =
-    commits.mapReduce[SortedMap[Int,Int]]( e => e._1 -> e._2.size )
-           .toList
-  
-  println( "Calculating range" )
-  val timeBins = commits.seq.keys
-  val limits = Range(timeBins.min,timeBins.max,period)
-
-  def getProjectLinks(from: Int, until: Int, minWeight: Int) = {
-    Timer.tick
-    println( "Calculating project links from %d until %d with minimum weight %d".format(from,until,minWeight) )
-    commits
-      .log( cs => println( "Filter %d time bins".format(cs.size) ) )
-      .par.filter( e => e._1 >= from && e._1 <= until ).map( kv => kv._2 ).flatten
-      .log( cs => println("Reduce %d commits to projects per user".format(cs.size) ) )
-      .reduceTo[ParMap[UserRef,Set[ProjectRef]]]
-      .map( kv => kv._2 )
-      .log( psets => println("Done reducing 1 in %d, Reducing %d project sets to link map".format(Timer.tick, psets.size) ) )
-      .par.mapReduce[ParMap[Link,Int]]( projectsToLinks )
-      .log( lm => println( "Done reducing 2 in %d, Filter %d links by weight".format(Timer.tick, lm.size) ) )
-      .filter( _._2 >= minWeight )
-      .log(cs => println("Done filtering in %d".format(Timer.tick)))
-  }
-  
+trait GHRelationsViz {
+  def getLimits: Future[Range]
+  def getProjectLinks(from: Int, until: Int, minWeight: Int): Future[GenMap[Link,Int]]
+  def getUser(id: UserRef): User
+  def getProject(id: ProjectRef): Project
+  def getUserProjectsLinksPerWeek: Future[Seq[(Int,Int)]]
 }
 
 object GHRelationsViz {

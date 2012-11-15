@@ -24,6 +24,7 @@ libraryDependencies ++= Seq(
   "org.scalaz" %% "scalaz-core" % "6.0.4",
   "net.van-antwerpen" %% "scala-collection-mapreduce" % "0.1.0-SNAPSHOT",
   "org.scalatra" % "scalatra" % "2.1.1",
+  "org.scalatra" % "scalatra-akka" % "2.1.1",
   "org.scalatra" % "scalatra-scalate" % "2.1.1",
   "net.liftweb" %% "lift-json" % "2.5-M1",
   "net.liftweb" %% "lift-json-ext" % "2.5-M1",
