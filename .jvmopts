@@ -1,4 +1,4 @@
 -XX:+UseParallelGC
 -Xms2048m
 -Xmx2048m
--Dconfig.file=application.conf
+-Dconfig.resource=application.conf

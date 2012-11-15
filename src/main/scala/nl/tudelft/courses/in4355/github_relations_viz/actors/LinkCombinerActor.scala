@@ -21,6 +21,7 @@ import akka.actor.Deploy
 import akka.remote.RemoteScope
 import akka.actor.AddressFromURIString
 
+
 //Link combiner actor. Able to initialize computer actors, and requesting them to obtain project links
 class LinkCombineActor extends Actor {
   implicit val timeout: Timeout = 2400 seconds
@@ -43,7 +44,7 @@ class LinkCombineActor extends Actor {
     //Initializing a series of other linkCombiners (possibly on a remote system)
     case ActorCombinerSet(configs) => {
       for (configVars <- configs) {
-        println("Initializing combiner actor")
+        println("Initializing combiner actor, deploying from "+context.system+" on "+configVars.system)
         val ref = context.actorOf(Props[LinkCombineActor].withDeploy(Deploy(scope = RemoteScope(configVars.system))))
         println("Reference is: "+ref)
         ref ! (configVars.initCommand)
@@ -143,30 +144,87 @@ class LinkcombineApplication {
 object combineLinks {
   
   def main(args: Array[String]) {
-      val system = ActorSystem("ghlink", ConfigFactory.load.getConfig("LinkCombine"))
+      val system = ActorSystem("ghlinkclient", ConfigFactory.load.getConfig("LinkCombine"))
       val actor = system.actorOf(Props[LinkCombineActor], "LinkCombineActor")
+      
+      //println("Reading commits...")
+      
+      //println("Commits size: "+GHResources.commits.size)
       
       println("intializing config.")
      val testActor = system.actorOf(Props(new Actor {
-	       
-	      val config = ActorCombinerSet(List(
-	          ActorCombinerConfig(AddressFromURIString("akka://ghlink@37.59.53.125:2553"), ActorComputationConfig(List(
-	        				  LinkComputerConfig(4, 0),
-	        				  LinkComputerConfig(4, 1),
-	        				  LinkComputerConfig(4, 2),
-	        				  LinkComputerConfig(4, 3)
-	        		      ))
-	             
-	        		  )
-	       ))
-	         val epoch1990 = 631148400
-	         val epoch2015= 1420066800  
-	         val epoch2000 = 973036800
+	val config = 
+	  ActorCombinerSet(List(
+	    ActorCombinerConfig(
+	     AddressFromURIString("akka://ghlink@37.59.53.125:2552"),        
+	     ActorCombinerSet(List(
+	       ActorCombinerConfig(
+	         AddressFromURIString("akka://ghlink@37.59.53.125:2552"), 
+	         ActorComputationConfig(List(
+        	   LinkComputerConfig(3, 0),
+			   LinkComputerConfig(3, 1)
+	         ))
+	       )
+	      
+	       ,    
+		       ActorCombinerConfig(
+		         AddressFromURIString("akka://ghlink@188.165.237.154:2552"), 
+		         ActorComputationConfig(List(
+			       LinkComputerConfig(3, 2)
+			       //LinkComputerConfig(10, 9)
+			       //LinkComputerConfig(12, 10),
+			       //LinkComputerConfig(12, 11)
+		         ))      
+		       )  
+		      
+	      ))
+	   )
+	   ))
+	   
+	   println("Config: "+config)
+    /**
+	 val config = 
+	    ActorCombinerConfig(
+	     AddressFromURIString("akka://ghlink@37.59.53.125:2552"),        
+	     ActorCombinerSet(List(
+	       ActorCombinerConfig(
+	         AddressFromURIString("akka://ghlink@37.59.53.125:2552"), 
+	         ActorComputationConfig(List(
+        	   LinkComputerConfig(12, 0),
+			   LinkComputerConfig(12, 1),
+			   LinkComputerConfig(12, 2),
+			   LinkComputerConfig(12, 3),
+			   LinkComputerConfig(12, 4),
+			   LinkComputerConfig(12, 5),
+			   LinkComputerConfig(12, 6),
+			   LinkComputerConfig(12, 7)
+	         ))
+	       )
+	        
+	       ,    
+	       ActorCombinerConfig(
+	         AddressFromURIString("akka://ghlink@188.165.237.154:2552"), 
+	         ActorComputationConfig(List(
+		       LinkComputerConfig(12, 8),
+		       LinkComputerConfig(12, 9),
+		       LinkComputerConfig(12, 10),
+		       LinkComputerConfig(12, 11)
+	         ))      
+	       )    
+	    ))
+	   )
+	   **/
+     val epoch1990 = 631148400
+     val epoch2015= 1420066800  
+     val epoch2000 = 973036800
+     val epoch2005 = 1104620719
+     val epoch2011 = 1293923119
+     val epoch2012 = 1325459119
   
-	       actor ! config
+	     actor ! config
 	       println("Config sent")
 	      Timer.tick
-	      actor !  obtainLinks(epoch1990,epoch2015)
+	      actor !  obtainLinks(epoch2011,epoch2012)
 	      def receive = {
 	        case linkResult(res) =>
 	          println("GOT THE RESULT!!!. Size is: %d".format(res.size))
