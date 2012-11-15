@@ -29,6 +29,9 @@ class TeeWriter(writer: Writer) extends Writer {
 
 object GHRelationsStats extends App {
 
+  val epoch1990 = 631148400
+  val epoch2015 = 1420066800
+  
   val PERIOD    = 7 * 24 * 3600
   val FROM      = epoch1990
   val TO        = epoch2015

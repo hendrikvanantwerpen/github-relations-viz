@@ -5,11 +5,10 @@ collaborators.
 
 ## Visualization
 
- * Can we do this http://bl.ocks.org/1667367? The timeline with the commits histogram?
- * The graph works best if the background covers everything, can we keep it fixed?
-
-What does the data look like? And after different steps?
-What if the data was bigger? Impact on data processing, visualisation?
+ * Return an error when the user selects too many links, so his browser
+   doesn't crash.
+ * Check that update between requests actually works.
+ * Graph animation even when it doesn't have the mouse focus.
 
 ## MapReduce
 

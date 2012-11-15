@@ -11,30 +11,30 @@
   <body>
     <div id="graph">
     </div>
-    <div class="">
-    	<div class="leftColumn">
-    		<div id="languages"></div>
-    	</div>
-    	<div class="rightColumn">
-            <div><span class="label">From</span><span id="date-from"></span></div>
-            <div><span class="label">Until</span><span id="date-to"></span></div>
-            <br />
-            <div id="date-range-slider"></div>
-            <br />
-            <div><span class="label">Min link value</span><span id="min-link-value"></span></div>
-            <br />
-            <div id="min-link-value-slider"></div>    
-    	</div>
-    </div>    
-    <div class="clearer"></div>
-    <div id="statusdiv"><span class="label">Nodes: </span><span id="visibleNodesLabel">0</span></span>/<span id="totalNodesLabel">0</span></div>
-    <div id="statusdiv"><span class="label">Links: </span><span id="visibleLinksLabel">0</span>/<span id="totalLinksLabel">0</span></div>
-    <div id="statusdiv"><span class="label">Status: </span><span id="statusLabel">starting</span></div>
+    <div id="controls">
+        <div class="leftColumn">
+            <div id="languages"></div>
+        </div>
+        <div class="rightColumn">
+            <div class="link-value-box">
+                <div><span id="min-link-value"></span></div>
+                <div id="min-link-value-slider"></div>
+            </div>
+            <div id="hist"></div>
+                
+        </div>
+    </div>
+    <table id="info">
+        <tr><td>Nodes</td><td><span id="visibleNodesLabel">0</span></span>/<span id="totalNodesLabel">0</span></td></tr>
+        <tr><td>Links</td><td><span id="visibleLinksLabel">0</span>/<span id="totalLinksLabel">0</span></td></tr>
+        <tr><td>Status</td><td><span id="statusLabel">starting</span></td></tr>
+    </table>
     <div id="pop-up" style="display:hidden;">
       <div id="pop-up-title"></div>
       <div id="pop-up-content">
       </div>
       </div>
     </div>
+    <div id="waiting"></div>
   </body>
 </html>

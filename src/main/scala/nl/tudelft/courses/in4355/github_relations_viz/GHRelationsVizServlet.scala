@@ -8,37 +8,67 @@ import net.liftweb.json.Printer._
 import net.liftweb.json.JsonDSL._
 import net.liftweb.json.Serialization.write
 import java.net.URL
-
 import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
+import scala.collection.GenMap
 
 class GHRelationsVizServlet extends ScalatraServlet {
+
+  val epoch1990 = 631148400
+  val epoch2015 = 1420066800  
 
   implicit val formats = net.liftweb.json.DefaultFormats
 
   println( "Create data processor" )
   val PERIOD = 7 * 24 * 3600
+  val LINK_LIMIT = 50000
   val datadir = "file:commits/"
   val projectsurl = new URL(datadir+"projects.txt")
   val usersurl = new URL(datadir+"users.txt")
   val forksurl = new URL(datadir+"forks.txt")
-  val commitsurl = new URL(datadir+"commits.txt")
-  val processor = new GHRelationsViz(projectsurl,usersurl,forksurl,commitsurl,PERIOD)
+  val commitsurl = new URL(datadir+"smallcommits.txt")
+  val processor = new GHRelationsViz(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD)
   println( "Ready to go!" )
   
   get("/range") {
     write(processor.limits)
   }
       
-  get("/d3data") {
+  get("/links") {
     val from = params get "from" map( _.toInt ) getOrElse( Int.MinValue )
     val to = params get "to" map( _.toInt ) getOrElse( Int.MaxValue )
     val minWeight = params get "minWeight" map( d => math.max(1,d.toInt) ) getOrElse( 1 )
     contentType = "application/json;charset=UTF-8"
-    write(getD3Data(from,to,minWeight))
+    val links = processor.getProjectLinks(from, to, minWeight)
+    if ( links.size > LINK_LIMIT ) {
+      write( ("error" -> "Too many links found. Please limit selection."):JObject )
+    } else {
+      write(getGraphJSON(links))
+    }
   }
 
+  get("/hist") {
+    contentType = "application/json;charset=UTF-8"
+    write(getHistJSON())
+  }
+  
+  def getGraphJSON(links: GenMap[Link,Int]) = {
+    println( "Convert project links to D3 data" )
+    val projectMap =
+      links
+        .mapReduce[Map[ProjectRef,Int]] { t =>
+           linkToProjects(t._1).map( p => (p,1) )
+         }
+    val d3nodes =
+      projectMap
+        .par.map( e => getProjectJSON(e._1,e._2) )
+    val d3links =
+      links.map( e => getLinkJSON(e._1,e._2) )
+    println( "Return D3 graph" )
+     ("links" -> d3links.seq) ~ ("projects" -> d3nodes.seq)
+  }  
+  
   def getUserJSON(id: UserRef) = {
     val user = processor.getUser(id)
     ( ("id" -> user.id) ~
@@ -57,32 +87,18 @@ class GHRelationsVizServlet extends ScalatraServlet {
   }
   
   def getLinkJSON(l: Link, value: Int) = {
-    ( ("source" -> l.project1) ~
-      ("target" -> l.project2) ~
+    ( ("project1" -> l.project1) ~
+      ("project2" -> l.project2) ~
       ("value" -> value) )
   }
-  
-  def getD3Data(from: Int, until: Int, minWeight: Int) = {
-    val links = 
-      processor.getProjectLinks(from, until, minWeight)
-    println( "Convert project links to D3 data" )
-    val projectMap =
-      links
-        .par.mapReduce[Map[ProjectRef,Int]] { t =>
-           linkToProjects(t._1).map( p => (p,1) )
-         }
-    val d3nodes =
-      projectMap
-        .par.map( e => getProjectJSON(e._1,e._2) )
-    val d3links =
-      links.par.toList
-        .map( e => getLinkJSON(e._1,e._2) ) 
-    println( "Return D3 graph" )
-     ("links" -> d3links.seq) ~ ("nodes" -> d3nodes.seq)
-  }  
   
   def linkToProjects(l: Link) =
     Set(l.project1,l.project2)
     
+  def getHistJSON() = {
+    processor.userProjectLinksPerWeek
+             .map( dc => ("date" -> dc._1) ~ ("count" -> dc._2) )
+  }
+  
   
 }

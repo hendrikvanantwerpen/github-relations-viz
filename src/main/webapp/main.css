@@ -1,38 +1,76 @@
 #graph {
+    height: 80%;
+}
+
+#controls {
+    float: left;
+    height: 20%;
     width: 100%;
-    height: 65%;
 }
 
 .leftColumn {
-	clear: left;
-	float: left;
-	width: 25%;
+    float: left;
+    width: 40%;
+    height: 100%;
 }
 .rightColumn {
-	clear: right;
-	float: right;
-	width: 75%;
+    float: right;
+    width: 60%;
+    height: 100%;
 }
 
-.clearer {
-	clear: both;
+#hist {
+    width: 95%;
+    height: 100%;
+    float: right;
+    clear: right;
 }
 
-.label {
-	display: inline-block;
-	width: 100px;
+.link-value-box {
+    width: 5%;
+    height: 100%;
+    float: left;
+    clear: left;
+}
+
+.hist-graph {
+    fill: blue;
+}
+
+.hist-brush .extent {
+    fill-opacity: 0.125;
+}
+
+.hist-axis path {
+    fill: none;
+    stroke: black;
+}
+
+.hist-axis .tick {
+    stroke: black;
+}
+
+#info {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: #ccc;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 10px 5px 10px;
+    -moz-border-radius: 8px 8px;
+    border-radius: 8px 8px;
 }
 
 .langButton .ui-button-text {
-	padding: 0px;
+    padding: 0px;
 }
 
 .langButton {
-	font-family: inherit;
-	font-weight: inherit;
-	font-size: 100%;
-	padding: 5px;
-	background-color: #bbb;
+    font-family: inherit;
+    font-weight: inherit;
+    font-size: 100%;
+    padding: 5px;
+    background-color: #bbb;
 }
 
 circle.node {
@@ -63,4 +101,14 @@ div#pop-up-title {
 }
 div#pop-up-content {
     font-size: 12px;
+}
+
+#waiting {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+    background: rgba(5,5,5,0.5);
+    z-index: 100;
 }
