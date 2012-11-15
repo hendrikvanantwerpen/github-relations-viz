@@ -57,9 +57,9 @@ $(document).ready(function(){
     // LANG
     
     var LANG = (new function(){
-    	var self = this;
-    	
-    	var LANG_DIV = "#languages";
+        var self = this;
+
+        var LANG_DIV = "#languages";
         var color = d3.scale.category20();
         var colormap = {}
         var btnmap = {}
@@ -81,6 +81,7 @@ $(document).ready(function(){
                 }).appendTo( LANG_DIV )[0];
                 btnmap[lang] = btn;
                 $( btn ).click(function(e){
+                    WAITING.busy();
                     if ( selected[lang] ) {
                         $( btn ).css( "background", "inherit" );
                         selected[lang] = false;
@@ -89,42 +90,43 @@ $(document).ready(function(){
                         selected[lang] = true;
                     }
                     GRAPH.update();
+                    WAITING.done();
                 });
             }
             return c;
         };
 
         self.setTotals = function(totals) {
-        	mapO(cntmap,function(lang,count){
-        		return 0;
-        	});
-        	mergeO(cntmap,totals);
-        	forEachO(totals,function(lang,total){
-        		self.getColor(lang);
+            mapO(cntmap,function(lang,count){
+                return 0;
+            });
+            mergeO(cntmap,totals);
+            forEachO(totals,function(lang,total){
+                self.getColor(lang);
                 cntmap[lang] = total;
-                $( btnmap[lang] ).button( "option", "label", (lang || UNKNOWN) + " (0/" + total + ")" );        		
-        	});
+                $( btnmap[lang] ).button( "option", "label", (lang || UNKNOWN) + " (0/" + total + ")" );
+            });
         };
-        
+
         self.setVisibles = function(visibles) {
-        	forEachO(cntmap,function(lang,total){
+            forEachO(cntmap,function(lang,total){
                 self.getColor(lang);
                 $( btnmap[lang] ).button( "option", "label", (lang || UNKNOWN) + " ("+(visibles[lang] || 0)+"/" + total + ")" );
-        	});        	
+            });
         };
-    	
+
         self.getSelected = function() {
-        	return selected;
+            return selected;
         };
-        
+
     });
     
     ///////////////////////////////////////
     // DATA
     
     var DATA = (new function(){
-    	var self = this;
-    	
+        var self = this;
+
         var minTime = maxTime = 0;
         var minLinkValue = 1;
 
@@ -145,29 +147,29 @@ $(document).ready(function(){
             nodesByLang = {};
             nodeCount = 0;
             forEachA(ns,function(n) {
-            	nodeCount += 1;
-            	newNodes[n.id] = nodes[n.id] ? mergeO(nodes[n.id],n) : n;
+                nodeCount += 1;
+                newNodes[n.id] = nodes[n.id] ? mergeO(nodes[n.id],n) : n;
                 if ( nodesByLang[n.lang] ) {
-                	nodesByLang[n.lang].push(n);
+                    nodesByLang[n.lang].push(n);
                 } else {
-                	nodesByLang[n.lang] = [n];
+                    nodesByLang[n.lang] = [n];
                 }
             });
             
             var newLinks = {};
             linkCount = 0;
             forEachA(ls,function(l){
-            	linkCount += 1;
+                linkCount += 1;
                 l.source = newNodes[l.project1];
                 l.target = newNodes[l.project2];
-            	newLinks[l.source.id+"-"+l.target.id] = l;
+                newLinks[l.source.id+"-"+l.target.id] = l;
             });
 
             nodes = newNodes;
             links = newLinks;
             
             LANG.setTotals(mapO(nodesByLang,function(lang,lns){
-            	return lns.length;
+                return lns.length;
             }));
 
             $( "#totalNodesLabel" ).text( nodeCount );
@@ -179,12 +181,12 @@ $(document).ready(function(){
         };
 
         self.setTimeRange = function(mint,maxt) {
-        	minTime = mint;
-        	maxTime = maxt;
+            minTime = mint;
+            maxTime = maxt;
         };
 
         self.setMinLinkValue = function(minlv) {
-        	minLinkValue = minlv;
+            minLinkValue = minlv;
         };        
         
         self.getNodes = function(){
@@ -196,50 +198,49 @@ $(document).ready(function(){
         };
         
         self.getMinLinkValue = function() {
-        	return minLinkValue;
+            return minLinkValue;
         }
         
         self.getTimeRange = function() {
-        	return [minTime,maxTime];
+            return [minTime,maxTime];
         }
 
         self.filterData = function() {
-        	
-        	var selectedlangs = LANG.getSelected();
 
+            var selectedlangs = LANG.getSelected();
 
-	        var possibleNodes = {};	        
-	        forEachO(nodesByLang,function(lang,nodes){
-	            if ( selectedlangs[lang] ) {
-	            	forEachA(nodes,function(node){
-	            		possibleNodes[node.id] = node;
-	            	});
-	            }        	
-	        });
-	        
+            var possibleNodes = {};
+            forEachO(nodesByLang,function(lang,nodes){
+                if ( selectedlangs[lang] ) {
+                    forEachA(nodes,function(node){
+                        possibleNodes[node.id] = node;
+                    });
+                }
+            });
+
             visibleLinks = [];
-	        var linkedNodes = {};
-	        forEachO(links,function(id,link){
-	            if ( link.value >= minLinkValue &&
-		             possibleNodes[link.source.id] &&
-		             possibleNodes[link.target.id] ) {
-		                linkedNodes[link.source.id] = link.source;
-		                linkedNodes[link.target.id] = link.target;
-		                visibleLinks.push(link);
-		            }
-	        });
+            var linkedNodes = {};
+            forEachO(links,function(id,link){
+                if ( link.value >= minLinkValue &&
+                     possibleNodes[link.source.id] &&
+                     possibleNodes[link.target.id] ) {
+                        linkedNodes[link.source.id] = link.source;
+                        linkedNodes[link.target.id] = link.target;
+                        visibleLinks.push(link);
+                    }
+            });
 
             visibleNodes = [];
-        	var langHist = {};
-        	forEachO(linkedNodes,function(id,node){
-        		langHist[node.lang] = (langHist[node.lang] || 0) + 1;
-        		visibleNodes.push(node);
-        	});
-        	LANG.setVisibles(langHist);
+            var langHist = {};
+            forEachO(linkedNodes,function(id,node){
+                langHist[node.lang] = (langHist[node.lang] || 0) + 1;
+                visibleNodes.push(node);
+            });
+            LANG.setVisibles(langHist);
 
             $( "#visibleNodesLabel" ).text( visibleNodes.length );
             $( "#visibleLinksLabel" ).text( visibleLinks.length );
-        	
+
         };
         
     });
@@ -248,281 +249,281 @@ $(document).ready(function(){
     // D3 Graph
     
     var GRAPH = (new function(){
-    	var self = this;
-	    	
-	    var graphWidth = $( "#graph" ).width(),
-	        graphHeight = $( "#graph" ).height(),
-	        graphTrans = [0,0],
-	        graphScale = 1;
-	
-	    var fisheye = d3.fisheye()
-	                    .radius(100)
-	                    .power(3);
-	
-	    var vis = d3.select("#graph")
-	                .append("svg:svg")
-	                .attr("width", graphWidth)
-	                .attr("height", graphHeight)
-	                .attr("pointer-events", "all")
-	                .append('svg:g')
-	                .call(d3.behavior.zoom().on("zoom", onzoom ))
-	                
-	    var background = vis.append('svg:g')
+        var self = this;
+
+        var graphWidth = $( "#graph" ).width(),
+            graphHeight = $( "#graph" ).height(),
+            graphTrans = [0,0],
+            graphScale = 1;
+
+        var fisheye = d3.fisheye()
+                        .radius(100)
+                        .power(3);
+
+        var vis = d3.select("#graph")
+                    .append("svg:svg")
+                    .attr("width", graphWidth)
+                    .attr("height", graphHeight)
+                    .attr("pointer-events", "all")
+                    .append('svg:g')
+                    .call(d3.behavior.zoom().on("zoom", onzoom ))
+
+        var background = vis.append('svg:g')
                             .append('svg:rect')
                             .attr('width', graphWidth)
                             .attr('height', graphHeight)
                             .attr('fill', 'white');
-	    var linkVis = vis.append('svg:g');
-	    var nodeVis = vis.append('svg:g');
-	
-	    function onzoom() {
-	        graphScale = d3.event.scale
-	        graphTrans = d3.event.translate
-	        nodeVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
-	        linkVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
-	    }
-	
-	    var force = d3.layout.force()
-	                  .size([graphWidth, graphHeight])
-	                  .charge(-500)
-	                  .linkDistance(function(link){
-	                      var d = link.source.value+link.target.value;
-	                      return 3*d; })
-	                  .linkStrength( 0.1 );
-	
-	    self.update = function() {
-	        STATUS.update("Updating graph...")
-	        force.stop();
-	
-	        DATA.filterData();
-	        var includedNodes = DATA.getNodes();
-	        var includedLinks = DATA.getLinks();
-	        
-	        force.nodes(includedNodes)
-	             .links(includedLinks);
-	
-	        var link = linkVis.selectAll("line.link")
-	                          .data(includedLinks, function(l){
-	                               return l.source.id+"-"+l.target.id; });
-	        
-	        link.enter()
-	            .append("svg:line")
-	            .attr("class", "link")
-	            .style("stroke-width", function(l) { 
-	                return Math.sqrt(l.value); })
-	            .style("stroke", "#CCC")
-	            .attr("x1", function(l) {
-	                return l.source.x; })
-	            .attr("y1", function(l) { 
-	                return l.source.y; })
-	            .attr("x2", function(l) { 
-	                return l.target.x; })
-	            .attr("y2", function(l) { 
-	                return l.target.y; })
-	            .on("mouseover", showLinkPopup)
-	            .on("mouseout", hidePopup);
-	
-	        link.exit().remove();
-	
-	        var node = nodeVis.selectAll("circle.node")
-	                          .data(includedNodes, function(n){ 
-	                               return n.id; });
-	
-	        node.enter()
-	            .append("svg:circle")
-	            .attr("class", "node")
-	            .attr("cx", function(n) {
-	                return n.x; })
-	            .attr("cy", function(n) {
-	                return n.y; })
-	            .attr("r", function(n) {
-	                return n.value; })
-	            .style("fill", function(n) { 
-	                return LANG.getColor(n.lang); })
-	            .on("mouseover", showNodePopup)
-	            .on("mouseout", hidePopup)
-	            .call(force.drag);
-	
-	        node.exit().remove();
-	
-	        force.on("tick", function() {
-	            node.attr("cx", function(n) {
-	                     return n.x; })
-	                .attr("cy", function(n) {
-	                     return n.y; })
-	                .attr("r", function(n) {
-	                     return n.value; });
-	            link.attr("x1", function(l) {
-	                     return l.source.x; })
-	                .attr("y1", function(l) {
-	                     return l.source.y; })
-	                .attr("x2", function(l) {
-	                     return l.target.x; })
-	                .attr("y2", function(l) {
-	                     return l.target.y; });
-	        });
-	        /*vis.on("mouseover", function() {
-	            fisheye.center(d3.mouse(this));
-	            node.each(function(n) { n.display = fisheye(n); })
-	                .attr("cx", function(n) {
-	                    return n.display.x; })
-	                .attr("cy", function(n) {
-	                    return n.display.y; })
-	                .attr("r", function(n) {
-	                    return n.display.z * n.value; });
-	            link.attr("x1", function(l) {
-	                    return l.source.display.x; })
-	                .attr("y1", function(l) {
-	                    return l.source.display.y; })
-	                .attr("x2", function(l) {
-	                    return l.target.display.x; })
-	                .attr("y2", function(l) {
-	                    return l.target.display.y; });
-	        });*/
-	        
-	        STATUS.update("Graph updated.")
-	        force.start();
-	    };
-	
-	    function showLinkPopup(l) {
-	        var x = d3.event.x
-	        var y = d3.event.y
-	        showPopup("Link: "+l.source.name+" - "+l.target.name,
-	                [l.value+" common contributors"],
-	                [x,y]);
-	    }
-	
-	    function showNodePopup(n) {
-	        showPopup("Project: "+n.name,
-	                  [n.desc || "",
-	                   "Language: "+(n.lang || UNKNOWN),
-	                   "Owner: "+(n.owner.name || n.owner.login || UNKNOWN),
-	                   n.value+" connected projects"],
-	                  [n.x,n.y]);
-	    }
-	
-	    function showPopup(title,contents,pos) {
-	        $("#pop-up").fadeOut(100,function () {
-	            // Popup content
-	            $("#pop-up-title").html(title);
-	            $("#pop-up-content").html( "" );
-	            for (var i = 0; i < contents.length; i++) {
-	                $("#pop-up-content").append("<div>"+contents[i]+"</div>");
-	            }
-	            // Popup position
-	            var popLeft = (pos[0]*graphScale)+graphTrans[0]+20;
-	            var popTop = (pos[1]*graphScale)+graphTrans[1]+20;
-	            $("#pop-up").css({"left":popLeft,"top":popTop});
-	            $("#pop-up").fadeIn(100);
-	        });
-	    }
-	    
-	    function hidePopup(n) {
-	        $("#pop-up").fadeOut(50);
-	        d3.select(this).attr("fill","url(#ten1)");
-	    }
-	
+        var linkVis = vis.append('svg:g');
+        var nodeVis = vis.append('svg:g');
+
+        function onzoom() {
+            graphScale = d3.event.scale
+            graphTrans = d3.event.translate
+            nodeVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
+            linkVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
+        }
+
+        var force = d3.layout.force()
+                      .size([graphWidth, graphHeight])
+                      .charge(-500)
+                      .linkDistance(function(link){
+                          var d = link.source.value+link.target.value;
+                          return 3*d; })
+                      .linkStrength( 0.1 );
+
+        self.update = function() {
+            STATUS.update("Updating graph...")
+            force.stop();
+
+            DATA.filterData();
+            var includedNodes = DATA.getNodes();
+            var includedLinks = DATA.getLinks();
+
+            force.nodes(includedNodes)
+                 .links(includedLinks);
+
+            var link = linkVis.selectAll("line.link")
+                              .data(includedLinks, function(l){
+                                   return l.source.id+"-"+l.target.id; });
+
+            link.enter()
+                .append("svg:line")
+                .attr("class", "link")
+                .style("stroke-width", function(l) { 
+                    return Math.sqrt(l.value); })
+                .style("stroke", "#CCC")
+                .attr("x1", function(l) {
+                    return l.source.x; })
+                .attr("y1", function(l) {
+                    return l.source.y; })
+                .attr("x2", function(l) {
+                    return l.target.x; })
+                .attr("y2", function(l) {
+                    return l.target.y; })
+                .on("mouseover", showLinkPopup)
+                .on("mouseout", hidePopup);
+
+            link.exit().remove();
+
+            var node = nodeVis.selectAll("circle.node")
+                              .data(includedNodes, function(n){ 
+                                   return n.id; });
+
+            node.enter()
+                .append("svg:circle")
+                .attr("class", "node")
+                .attr("cx", function(n) {
+                    return n.x; })
+                .attr("cy", function(n) {
+                    return n.y; })
+                .attr("r", function(n) {
+                    return n.value; })
+                .style("fill", function(n) { 
+                    return LANG.getColor(n.lang); })
+                .on("mouseover", showNodePopup)
+                .on("mouseout", hidePopup)
+                .call(force.drag);
+
+            node.exit().remove();
+
+            force.on("tick", function() {
+                node.attr("cx", function(n) {
+                         return n.x; })
+                    .attr("cy", function(n) {
+                         return n.y; })
+                    .attr("r", function(n) {
+                         return n.value; });
+                link.attr("x1", function(l) {
+                         return l.source.x; })
+                    .attr("y1", function(l) {
+                         return l.source.y; })
+                    .attr("x2", function(l) {
+                         return l.target.x; })
+                    .attr("y2", function(l) {
+                         return l.target.y; });
+            });
+            /*vis.on("mouseover", function() {
+                fisheye.center(d3.mouse(this));
+                node.each(function(n) { n.display = fisheye(n); })
+                    .attr("cx", function(n) {
+                        return n.display.x; })
+                    .attr("cy", function(n) {
+                        return n.display.y; })
+                    .attr("r", function(n) {
+                        return n.display.z * n.value; });
+                link.attr("x1", function(l) {
+                        return l.source.display.x; })
+                    .attr("y1", function(l) {
+                        return l.source.display.y; })
+                    .attr("x2", function(l) {
+                        return l.target.display.x; })
+                    .attr("y2", function(l) {
+                        return l.target.display.y; });
+            });*/
+
+            STATUS.update("Graph updated.")
+            force.start();
+        };
+
+        function showLinkPopup(l) {
+            var x = d3.event.x
+            var y = d3.event.y
+            showPopup("Link: "+l.source.name+" - "+l.target.name,
+                    [l.value+" common contributors"],
+                    [x,y]);
+        }
+    
+        function showNodePopup(n) {
+            showPopup("Project: "+n.name,
+                      [n.desc || "",
+                       "Language: "+(n.lang || UNKNOWN),
+                       "Owner: "+(n.owner.name || n.owner.login || UNKNOWN),
+                       n.value+" connected projects"],
+                      [n.x,n.y]);
+        }
+    
+        function showPopup(title,contents,pos) {
+            $("#pop-up").fadeOut(100,function () {
+                // Popup content
+                $("#pop-up-title").html(title);
+                $("#pop-up-content").html( "" );
+                for (var i = 0; i < contents.length; i++) {
+                    $("#pop-up-content").append("<div>"+contents[i]+"</div>");
+                }
+                // Popup position
+                var popLeft = (pos[0]*graphScale)+graphTrans[0]+20;
+                var popTop = (pos[1]*graphScale)+graphTrans[1]+20;
+                $("#pop-up").css({"left":popLeft,"top":popTop});
+                $("#pop-up").fadeIn(100);
+            });
+        }
+        
+        function hidePopup(n) {
+            $("#pop-up").fadeOut(50);
+            d3.select(this).attr("fill","url(#ten1)");
+        }
+    
     });
     
     ///////////////////////////////////////
     // Date range
 
     var HIST = (new function(){
-    	var self = this;
-    	
-	    var histMargin = {top: 10, right: 10, bottom: 50, left: 50},
-	        histWidth = $( "#hist" ).width() - histMargin.left - histMargin.right,
-	        histHeight = $( "#hist" ).height() - histMargin.top - histMargin.bottom,
-	        histX = d3.time.scale().range([0, histWidth]),
-	        histY = d3.scale.log().range([histHeight,0]);
-	    
-	    var histXAxis = d3.svg.axis()
-	                          .scale(histX)
-	                          .ticks(d3.time.years,1)
-	                          .tickFormat(d3.time.format("%Y"))
-	                          .orient("bottom");
-	
-	    var histYAxis = d3.svg.axis()
-	                          .scale(histY)
-	                          .ticks(1)
-	                          .orient("left");
-	
-	    var histBrush = d3.svg.brush()
-	                          .x(histX)
-	                          .on("brush", onHistBrush)
-	                          .on("brushend", onHistBrushEnd);
-	    
-	    var histArea = d3.svg.line()
-	                         .x(function(d) {
-	                             return histX(d.date); })
-	                         .y(function(d) {
-	                             return histY(d.count); });
-	
-	    var hist = d3.select( "#hist" )
-	                 .append("svg")
-	                 .attr("width", histWidth + histMargin.left + histMargin.right)
-	                 .attr("height", histHeight + histMargin.top + histMargin.bottom)
-	                 
-	    var histGraph = hist.append("g")
-	                        .attr("transform", "translate(" + histMargin.left + "," + histMargin.top + ")")
-	                        .attr( "class", "hist-graph" );
-	    
-	    var histContext = hist.append("g")
-	                          .attr("transform", "translate(" + histMargin.left + "," + histMargin.top + ")")
-	                          .attr( "class", "hist-context" );
-	
-	    var histXAxisG = histContext.append("g")
-	                                .attr( "class", "hist-axis" )
-	                                .attr("transform", "translate(0," + histHeight + ")");
-	
-	    var histYAxisG = histContext.append("g")
-	                                .attr( "class", "hist-axis" );
-	
-	    histContext.append("g")
-	               .attr("class", "hist-brush" )
-	               .call(histBrush)
-	               .selectAll("rect")
-	               .attr("y", -6)
-	               .attr("height", histHeight + 7);        
-	
-	    function onHistBrush() {
-	        if ( !histBrush.empty() ) {
-	        	var e = histBrush.extent();
-	        	DATA.setTimeRange(Math.round(e[0].getTime() / 1000),
+        var self = this;
+        
+        var histMargin = {top: 10, right: 10, bottom: 50, left: 50},
+            histWidth = $( "#hist" ).width() - histMargin.left - histMargin.right,
+            histHeight = $( "#hist" ).height() - histMargin.top - histMargin.bottom,
+            histX = d3.time.scale().range([0, histWidth]),
+            histY = d3.scale.log().range([histHeight,0]);
+        
+        var histXAxis = d3.svg.axis()
+                              .scale(histX)
+                              .ticks(d3.time.years,1)
+                              .tickFormat(d3.time.format("%Y"))
+                              .orient("bottom");
+    
+        var histYAxis = d3.svg.axis()
+                              .scale(histY)
+                              .ticks(1)
+                              .orient("left");
+    
+        var histBrush = d3.svg.brush()
+                              .x(histX)
+                              .on("brush", onHistBrush)
+                              .on("brushend", onHistBrushEnd);
+        
+        var histArea = d3.svg.line()
+                             .x(function(d) {
+                                 return histX(d.date); })
+                             .y(function(d) {
+                                 return histY(d.count); });
+    
+        var hist = d3.select( "#hist" )
+                     .append("svg")
+                     .attr("width", histWidth + histMargin.left + histMargin.right)
+                     .attr("height", histHeight + histMargin.top + histMargin.bottom)
+                     
+        var histGraph = hist.append("g")
+                            .attr("transform", "translate(" + histMargin.left + "," + histMargin.top + ")")
+                            .attr( "class", "hist-graph" );
+        
+        var histContext = hist.append("g")
+                              .attr("transform", "translate(" + histMargin.left + "," + histMargin.top + ")")
+                              .attr( "class", "hist-context" );
+    
+        var histXAxisG = histContext.append("g")
+                                    .attr( "class", "hist-axis" )
+                                    .attr("transform", "translate(0," + histHeight + ")");
+    
+        var histYAxisG = histContext.append("g")
+                                    .attr( "class", "hist-axis" );
+    
+        histContext.append("g")
+                   .attr("class", "hist-brush" )
+                   .call(histBrush)
+                   .selectAll("rect")
+                   .attr("y", -6)
+                   .attr("height", histHeight + 7);        
+    
+        function onHistBrush() {
+            if ( !histBrush.empty() ) {
+                var e = histBrush.extent();
+                DATA.setTimeRange(Math.round(e[0].getTime() / 1000),
                                   Math.round(e[1].getTime() / 1000));
-	        }
-	    }    
-	    
-	    function onHistBrushEnd() {
-	        if ( histBrush.empty() ) {
-	            DATA.setData([],[]);
-	            GRAPH.update();
-	        } else {
-	            REST.requestGraphData();
-	        }
-	    }
-	    
-	    self.setData = function setData(data) {
-	        STATUS.update("Setting activity histogram.");
-	        
-	        forEachA(data,function(d){
-	        	d.date = new Date(d.date*1000);
-	        });
-	        histX.domain(d3.extent(data, function(d) {
-	            return d.date; }));
-	        histY.domain([1, d3.max(data, function(d) {
-	            return d.count; })]);
-	
-	        histGraph.append("path")
-	           .datum(data)
-	           .attr("d", histArea);
-	        
-	        histXAxisG.call(histXAxis);
-	        histYAxisG.call(histYAxis);
-	        histXAxisG.selectAll("text")
-	                 .attr("transform"," translate(15,10) rotate(45)");
-	        STATUS.update("Histogram rendered. Ready.");
-	    };
+            }
+        }    
+        
+        function onHistBrushEnd() {
+            if ( histBrush.empty() ) {
+                DATA.setData([],[]);
+                GRAPH.update();
+            } else {
+                REST.requestGraphData();
+            }
+        }
+        
+        self.setData = function setData(data) {
+            STATUS.update("Setting activity histogram.");
+            
+            forEachA(data,function(d){
+                d.date = new Date(d.date*1000);
+            });
+            histX.domain(d3.extent(data, function(d) {
+                return d.date; }));
+            histY.domain([1, d3.max(data, function(d) {
+                return d.count; })]);
+    
+            histGraph.append("path")
+               .datum(data)
+               .attr("d", histArea);
+            
+            histXAxisG.call(histXAxis);
+            histYAxisG.call(histYAxis);
+            histXAxisG.selectAll("text")
+                     .attr("transform"," translate(15,10) rotate(45)");
+            STATUS.update("Histogram rendered. Ready.");
+        };
 
     });
     
@@ -530,8 +531,8 @@ $(document).ready(function(){
     // Min link value
 
     var LINKSLIDER = (new function(){
-    	var self = this;
-    	
+        var self = this;
+        
         $( "#min-link-value-slider" ).slider({
             orientation: "vertical",
             range: false,
@@ -539,10 +540,10 @@ $(document).ready(function(){
             max: 25,
             value: 1,
             slide: function( event, ui ) {
-            	updateMinLinkValue(ui.value);
+                updateMinLinkValue(ui.value);
             },
             stop: function( event, ui ) {
-            	updateMinLinkValue(ui.value);
+                updateMinLinkValue(ui.value);
                 REST.requestGraphData();
             }
         });
@@ -565,15 +566,15 @@ $(document).ready(function(){
     // Query graph
 
     var STATUS = (new function(){
-    	var self = this;
+        var self = this;
         self.update = function(msg) {
             $("#statusLabel").text(msg);
         };
     });
 
     var REST = (new function(){
-    	var self = this;
-    	
+        var self = this;
+        
         var request = null;
         self.requestGraphData = function() {
             if(request !== null) {
@@ -614,7 +615,7 @@ $(document).ready(function(){
              .error(function(error){
                  STATUS.update("Error when requesting histogram data.");
                  WAITING.done();
-             });        	
+             });            
         };
         
     });
@@ -623,7 +624,7 @@ $(document).ready(function(){
     // Waiting indicator    
     
     var WAITING = (new function(){
-    	var self = this;
+        var self = this;
 
         self.busy = function() {
             var offset = $( "#controls" ).offset();
@@ -649,46 +650,46 @@ $(document).ready(function(){
     // Utils
     
     function forEachA(array,f) {
-    	var n = array.length;
-    	for ( var i = 0; i < n; i++ ) {
-    		f(array[i],i);
-    	}
+        var n = array.length;
+        for ( var i = 0; i < n; i++ ) {
+            f(array[i],i);
+        }
     }
 
     function mapA(array,f) {
-    	var newArray = [];
-    	var n = array.length;
-    	for ( var i = 0; i < n; i++ ) {
-    		newArray.push(f(array[i],i));
-    	}
-    	return array;
+        var newArray = [];
+        var n = array.length;
+        for ( var i = 0; i < n; i++ ) {
+            newArray.push(f(array[i],i));
+        }
+        return array;
     }
 
     function forEachO(obj,f) {
-    	for ( var prop in obj ) {
-    		if ( obj.hasOwnProperty(prop) ) {
-    			f(prop,obj[prop]);
-    		}
-    	}
+        for ( var prop in obj ) {
+            if ( obj.hasOwnProperty(prop) ) {
+                f(prop,obj[prop]);
+            }
+        }
     }
     
     function mapO(obj,f) {
-    	var newObj = {};
-    	for ( var prop in obj ) {
-    		if ( obj.hasOwnProperty(prop) ) {
-    			newObj[prop] = f(prop,obj[prop]);
-    		}
-    	}
-    	return newObj;
+        var newObj = {};
+        for ( var prop in obj ) {
+            if ( obj.hasOwnProperty(prop) ) {
+                newObj[prop] = f(prop,obj[prop]);
+            }
+        }
+        return newObj;
     }
     
     function mergeO(obj,newObj) {
-    	for ( var prop in newObj ) {
-    		if ( newObj.hasOwnProperty(prop) ) {
-    			obj[prop] = newObj[prop];
-    		}
-    	}
-    	return obj;
+        for ( var prop in newObj ) {
+            if ( newObj.hasOwnProperty(prop) ) {
+                obj[prop] = newObj[prop];
+            }
+        }
+        return obj;
     }
     
 });
