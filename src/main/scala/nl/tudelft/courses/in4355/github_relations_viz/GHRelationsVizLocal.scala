@@ -52,11 +52,6 @@ class GHRelationsVizLocal(projectsurl: URL,
            .toList
   def getUserProjectsLinksPerWeek = Promise.successful { userProjectLinksPerWeek }
   
-  println( "Calculating range" )
-  val timeBins = commits.seq.keys
-  val limits = Range(timeBins.min,timeBins.max,period)
-  def getLimits = Promise.successful { limits }
-
   def getProjectLinks(from: Int, until: Int, minWeight: Int) = Promise.successful {
     Timer.tick
     println( "Calculating project links from %d until %d with minimum weight %d".format(from,until,minWeight) )

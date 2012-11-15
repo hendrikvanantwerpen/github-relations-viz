@@ -31,5 +31,4 @@ object GHEntities {
     }
   }
   
-  case class Range(min:Int,max:Int,step:Int)
 }

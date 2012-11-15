@@ -41,8 +41,6 @@ class GHRelationsVizDist(projectsurl: URL,
   
   val linkCombineActor = system.actorOf(Props[LinkCombineActor], "LinkCombineActor")
 
-  def getLimits = Promise.successful ( Range(0,0,0) )
-
   def getProjectLinks(from: Int, until: Int, minWeight: Int) =
     (linkCombineActor ? obtainLinks(from,until)).map( _.asInstanceOf[linkResult].map )
 

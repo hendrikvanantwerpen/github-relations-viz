@@ -41,10 +41,6 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
     }
   println( "Ready to go!" )
   
-  get("/range") {
-    Ok(write(processor.getLimits))
-  }
-
   get("/links") {
     val from = params get "from" map( _.toInt ) getOrElse( Int.MinValue )
     val to = params get "to" map( _.toInt ) getOrElse( Int.MaxValue )

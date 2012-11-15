@@ -14,7 +14,6 @@ import scala.collection.GenMap
 import akka.dispatch.Future
 
 trait GHRelationsViz {
-  def getLimits: Future[Range]
   def getProjectLinks(from: Int, until: Int, minWeight: Int): Future[GenMap[Link,Int]]
   def getUser(id: UserRef): User
   def getProject(id: ProjectRef): Project
