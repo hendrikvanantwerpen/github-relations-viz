@@ -12,6 +12,7 @@
     float: left;
     width: 40%;
     height: 100%;
+    overflow-y: scroll;
 }
 .rightColumn {
     float: right;
@@ -20,17 +21,17 @@
 }
 
 #hist {
-    width: 95%;
+    width: 90%;
     height: 100%;
     float: right;
     clear: right;
 }
 
 .link-value-box {
-    width: 5%;
     height: 100%;
     float: left;
     clear: left;
+    padding: 10px;
 }
 
 .hist-graph {

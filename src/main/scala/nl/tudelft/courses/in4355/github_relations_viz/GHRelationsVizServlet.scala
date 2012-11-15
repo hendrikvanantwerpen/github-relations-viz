@@ -22,12 +22,12 @@ class GHRelationsVizServlet extends ScalatraServlet {
 
   println( "Create data processor" )
   val PERIOD = 7 * 24 * 3600
-  val LINK_LIMIT = 50000
+  val LINK_LIMIT = 10000
   val datadir = "file:commits/"
   val projectsurl = new URL(datadir+"projects.txt")
   val usersurl = new URL(datadir+"users.txt")
   val forksurl = new URL(datadir+"forks.txt")
-  val commitsurl = new URL(datadir+"smallcommits.txt")
+  val commitsurl = new URL(datadir+"commits.txt")
   val processor = new GHRelationsViz(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD)
   println( "Ready to go!" )
   

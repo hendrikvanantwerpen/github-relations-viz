@@ -172,8 +172,8 @@ $(document).ready(function(){
 
             $( "#totalNodesLabel" ).text( nodeCount );
             $( "#totalLinksLabel" ).text( linkCount );
-            $( "#visibleNodesLabel" ).text( nodeCount );
-            $( "#visibleLinksLabel" ).text( linkCount );
+            $( "#visibleNodesLabel" ).text( "0" );
+            $( "#visibleLinksLabel" ).text( "0" );
             
             STATUS.update("Data updated.");
         };
@@ -237,6 +237,9 @@ $(document).ready(function(){
         	});
         	LANG.setVisibles(langHist);
 
+            $( "#visibleNodesLabel" ).text( visibleNodes.length );
+            $( "#visibleLinksLabel" ).text( visibleLinks.length );
+        	
         };
         
     });
@@ -263,12 +266,13 @@ $(document).ready(function(){
 	                .attr("pointer-events", "all")
 	                .append('svg:g')
 	                .call(d3.behavior.zoom().on("zoom", onzoom ))
-	                .append('svg:g');
-	    
+	                
 	    var background = vis.append('svg:rect')
 	                        .attr('width', graphWidth)
 	                        .attr('height', graphHeight)
 	                        .attr('fill', 'white');
+	    var linkVis = vis.append('svg:g');
+	    var nodeVis = vis.append('svg:g');
 	
 	    function onzoom() {
 	        graphScale = d3.event.scale
@@ -296,9 +300,9 @@ $(document).ready(function(){
 	        force.nodes(includedNodes)
 	             .links(includedLinks);
 	
-	        var link = vis.selectAll("line.link")
-	                      .data(includedLinks, function(l){
-	                          return  l.source.id+"-"+l.target.id; });
+	        var link = linkVis.selectAll("line.link")
+	                          .data(includedLinks, function(l){
+	                               return l.source.id+"-"+l.target.id; });
 	        
 	        link.enter()
 	            .append("svg:line")
@@ -319,9 +323,9 @@ $(document).ready(function(){
 	
 	        link.exit().remove();
 	
-	        var node = vis.selectAll("circle.node")
-	                      .data(includedNodes, function(n){ 
-	                          return n.id; });
+	        var node = nodeVis.selectAll("circle.node")
+	                          .data(includedNodes, function(n){ 
+	                               return n.id; });
 	
 	        node.enter()
 	            .append("svg:circle")
@@ -530,7 +534,7 @@ $(document).ready(function(){
         $( "#min-link-value-slider" ).slider({
             orientation: "vertical",
             range: false,
-            min: 1,
+            min: 2,
             max: 25,
             value: 1,
             slide: function( event, ui ) {
@@ -551,6 +555,8 @@ $(document).ready(function(){
             DATA.setMinLinkValue(val);
             $('#min-link-value').text( val );
         }
+        
+        updateMinLinkValue(2);
     });
     
     
