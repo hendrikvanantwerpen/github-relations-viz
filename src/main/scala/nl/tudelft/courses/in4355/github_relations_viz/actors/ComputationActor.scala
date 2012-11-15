@@ -8,14 +8,13 @@ import java.net.URL
 
 //The computation actor. Upon receiving a request it computes the links and sends the result back to the sender
 class ComputationActor() extends Actor{
-	val url = new URL("file://Users/nielsvankaam/Documents/Studie/FuncProgramming/repo/github-relations-viz/commits/commits.txt")
 	var computeEngine: GHObtainLinks = null
 	def receive = {
 	  case LinkComputerConfig(divisor, remainder) =>
-	    println("Obtaining compute engine with url: %s, modulor %d and remainder %d".format(url, divisor, remainder))
-	    computeEngine = new GHObtainLinks(url, divisor, remainder)
+	    println("Obtaining compute engine with modulo %d and remainder %d".format(divisor, remainder))
+	    computeEngine = new GHObtainLinks(divisor, remainder)
 	  case obtainLinks(from, until) =>
-	    println("Actor "+this.toString()+" Obtaining links from %d, to %d.".format(from, until))
+	    println("Actor "+this.toString()+" Obtaining links from %d, to %d in actor %s.".format(from, until, this))
 	    val links = computeEngine.obtainLinks(from, until)
 	    println("Actor "+this.toString()+" Sending result back to"+sender.toString)
 	    sender ! linkResult(links)

@@ -57,7 +57,8 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl:
 object GHRelationsViz {
 
   val epoch1990 = 631148400
-  val epoch2015= 1420066800  
+  val epoch2015= 1420066800 
+  val epoch2000 = 973036800
   
   def getLines(url: URL) =
     scalax.io.Resource.fromURL(url)
