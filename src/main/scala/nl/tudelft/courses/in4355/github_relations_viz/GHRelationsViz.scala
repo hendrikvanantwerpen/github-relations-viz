@@ -8,9 +8,10 @@ import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import Logger._
+import scala.collection.immutable.SortedMap
 import scala.collection.parallel.ParMap
 
-class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl: URL, period: Int) {
+class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl: URL, minFrom: Int, maxUntil: Int, period: Int) {
   import GHRelationsViz._
 
   println( "Reading users" )
@@ -26,16 +27,23 @@ class GHRelationsViz(projectsurl: URL, usersurl: URL, forksurl: URL, commitsurl:
   
   println( "Reading commits" )
   val commits = readCommits(commitsurl)
-    .mapReduce[Map[Int,Set[(UserRef,ProjectRef)]]] { c =>
-      Some(c).filter( c => c.timestamp != 0 )
-     	     .filter( c => !forks.contains(c.project) )
-     	     .map( c => (getBinnedTime(period)(c.timestamp),(c.user,c.project)) )
-     	     .toList
+    .mapReduce[ParMap[Int,Set[(UserRef,ProjectRef)]]] { c =>
+      Some(c).filter( c => c.timestamp >= minFrom &&
+                           c.timestamp <= maxUntil &&
+                           !forks.contains(c.project) )
+             .map( c => (getBinnedTime(period)(c.timestamp),(c.user,c.project)) )
+             .toList
      }
 
-  println( "Calculating limits" )
-  val limits = Range(epoch1990,epoch2015,period)
+  println( "Calculating project-user/week histogram" )
+  val userProjectLinksPerWeek =
+    commits.mapReduce[SortedMap[Int,Int]]( e => e._1 -> e._2.size )
+           .toList
   
+  println( "Calculating range" )
+  val timeBins = commits.seq.keys
+  val limits = Range(timeBins.min,timeBins.max,period)
+
   def getProjectLinks(from: Int, until: Int, minWeight: Int) = {
     Timer.tick
     println( "Calculating project links from %d until %d with minimum weight %d".format(from,until,minWeight) )
