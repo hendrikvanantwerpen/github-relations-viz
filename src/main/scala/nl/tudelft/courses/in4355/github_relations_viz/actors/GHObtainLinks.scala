@@ -7,14 +7,15 @@ import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 
-class GHObtainLinks(url: URL, actorCount: Int, actorIndex: Int) {
+class GHObtainLinks(actorCount: Int, actorIndex: Int) {
 
     def isActorTask(c: Commit) =
         c.user % actorCount == actorIndex
 
 	println("Reading commits for actor %d out of %d".format(actorIndex, actorCount))
-	val commits = readCommits(url).filter( isActorTask )
-	  
+	val commits = GHResources.commits.filter( isActorTask )
+	println("Done reading commits for actor %d out of %d and size %d".format(actorIndex, actorCount, commits.size))  
+	
 	def obtainLinks(from: Int, until: Int) = {
 	  //Size uitrekenen kost 1 minuut? Oja, niet geordent :P
 	  println("Started filtering lines")

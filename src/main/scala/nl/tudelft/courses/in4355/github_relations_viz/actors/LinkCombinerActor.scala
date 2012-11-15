@@ -22,16 +22,17 @@ import akka.actor.AddressFromURIString
 
 //Link combiner actor. Able to initialize computer actors, and requesting them to obtain project links
 class LinkCombineActor extends Actor {
-  implicit val timeout: Timeout = 60 seconds
+  implicit val timeout: Timeout = 2400 seconds
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   
   println("Initialized linkcombiner actor")
   
   def receive = {
     //Obtain links request. Ask the children, map a foldleft over them, and pipe the result back to the sender of the request. Crap, just two lines :O
-    case o: obtainLinks => 
-      Future.sequence(for (child <- context.children) yield child.ask(o).mapTo[linkResult].map(_.map))
-      .map(_.foldLeft(Map[Link,Int]())   ((i,s) => i |<| s)).pipeTo(sender)
+    case o: obtainLinks =>
+      println("Received link obtain command. Sending to %d children.".format(context.children.size))
+      var res = Future.sequence(for (child <- context.children) yield child.ask(o).mapTo[linkResult].map(_.map))
+      .map(_.foldLeft(Map[Link,Int]())   ((i,s) => i |<| s)).map(linkResult(_)).pipeTo(sender)
     //Initializing a series of computers
     case ActorComputationConfig(computers) =>
       println("Initializing computation actor")
@@ -42,7 +43,7 @@ class LinkCombineActor extends Actor {
     case ActorCombinerSet(configs) => {
       for (configVars <- configs) {
         println("Initializing combiner actor")
-        val ref = context.system.actorOf(Props[LinkCombineActor].withDeploy(Deploy(scope = RemoteScope(configVars.system))))
+        val ref = context.actorOf(Props[LinkCombineActor].withDeploy(Deploy(scope = RemoteScope(configVars.system))))
         println("Reference is: "+ref)
         ref ! (configVars.initCommand)
       }
@@ -69,7 +70,7 @@ class LinkcombineApplication {
   val actor = system.actorOf(Props[LinkCombineActor], "lookupActor")
 
   val minDegree = 5;
-  implicit val timeout = Timeout(240 seconds) // needed for `?` below
+  implicit val timeout = Timeout(3000 seconds) // needed for `?` below
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   
   val remoteActorUrls = List(
@@ -157,9 +158,17 @@ object combineLinks {
 	             
 	        		  )
 	       ))
-	       
+	         val epoch1990 = 631148400
+	         val epoch2015= 1420066800  
+	         val epoch2000 = 973036800
+  
 	       actor ! config
 	       println("Config sent")
+	      
+	      Thread.sleep(8500)
+	      println("Awoken")
+	      
+	      actor !  obtainLinks(epoch1990,epoch2000)
 	      def receive = {
 	        case linkResult(res) =>
 	          println("GOT THE RESULT!!!. Size is: %d".format(res.size))
