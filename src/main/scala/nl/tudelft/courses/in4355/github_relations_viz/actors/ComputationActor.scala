@@ -15,7 +15,7 @@ class ComputationActor() extends Actor{
 	    computeEngine = new GHObtainLinks(divisor, remainder)
 	  case obtainLinks(from, until) =>
 	    println("Actor "+this.toString()+" Obtaining links from %d, to %d in actor %s.".format(from, until, this))
-	    val links = computeEngine.obtainLinks(from, until)
+	    val links = computeEngine.getProjectLinks(from, until)
 	    println("Actor "+this.toString()+" Sending result back to"+sender.toString)
 	    sender ! linkResult(links)
 	  case _ =>

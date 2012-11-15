@@ -4,6 +4,7 @@ import akka.actor.Actor
 import java.net.URL
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities.Link
 import akka.actor.Address
+import scala.collection.GenMap
 
 trait ActorCommand
 
@@ -26,4 +27,4 @@ case class ActorComputationConfig(computers: List[LinkComputerConfig]) extends A
 
 trait linkResults
 
-case class linkResult(map: Map[Link, Int])
+case class linkResult(map: GenMap[Link, Int])

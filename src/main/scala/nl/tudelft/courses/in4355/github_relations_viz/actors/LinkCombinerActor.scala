@@ -1,4 +1,5 @@
 package nl.tudelft.courses.in4355.github_relations_viz.actors
+import nl.tudelft.courses.in4355.github_relations_viz.Timer
 import com.typesafe.config.ConfigFactory
 import akka.actor.{ ActorRef, Props, Actor, ActorSystem }
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities.Link
@@ -31,7 +32,7 @@ class LinkCombineActor extends Actor {
     //Obtain links request. Ask the children, map a foldleft over them, and pipe the result back to the sender of the request. Crap, just two lines :O
     case o: obtainLinks =>
       println("Received link obtain command. Sending to %d children.".format(context.children.size))
-      var res = Future.sequence(for (child <- context.children) yield child.ask(o).mapTo[linkResult].map(_.map))
+      Future.sequence(for (child <- context.children) yield child.ask(o).mapTo[linkResult].map(_.map))
       .map(_.foldLeft(Map[Link,Int]())   ((i,s) => i |<| s)).map(linkResult(_)).pipeTo(sender)
     //Initializing a series of computers
     case ActorComputationConfig(computers) =>
@@ -149,7 +150,7 @@ object combineLinks {
      val testActor = system.actorOf(Props(new Actor {
 	       
 	      val config = ActorCombinerSet(List(
-	          ActorCombinerConfig(AddressFromURIString("akka://ghlink@127.0.0.1:2553"), ActorComputationConfig(List(
+	          ActorCombinerConfig(AddressFromURIString("akka://ghlink@37.59.53.125:2553"), ActorComputationConfig(List(
 	        				  LinkComputerConfig(4, 0),
 	        				  LinkComputerConfig(4, 1),
 	        				  LinkComputerConfig(4, 2),
@@ -164,14 +165,12 @@ object combineLinks {
   
 	       actor ! config
 	       println("Config sent")
-	      
-	      Thread.sleep(8500)
-	      println("Awoken")
-	      
-	      actor !  obtainLinks(epoch1990,epoch2000)
+	      Timer.tick
+	      actor !  obtainLinks(epoch1990,epoch2015)
 	      def receive = {
 	        case linkResult(res) =>
 	          println("GOT THE RESULT!!!. Size is: %d".format(res.size))
+	          println("Result took %d".format(Timer.tick))
 	      }
      }))
   }
