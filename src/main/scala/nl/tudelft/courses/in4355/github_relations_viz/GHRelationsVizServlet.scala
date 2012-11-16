@@ -30,11 +30,11 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
   val projectsurl = new URL(datadir+"projects.txt")
   val usersurl = new URL(datadir+"users.txt")
   val forksurl = new URL(datadir+"forks.txt")
-  val commitsurl = new URL(datadir+"smallcommits.txt")
+  val commitsurl = new URL(datadir+"commits.txt")
   val (system: ActorSystem, processor:GHRelationsViz) =
-    if ( false ) {
+    if ( true ) {
       val s = ActorSystem("ghlink", ConfigFactory.load.getConfig("LinkCombine"))
-      (s,new GHRelationsVizDist(projectsurl,usersurl,s))
+      (s,new GHRelationsVizDist(projectsurl,usersurl, commitsurl, forksurl,s,epoch1990,epoch2015,PERIOD))
     } else {
       (ActorSystem(),
        new GHRelationsVizLocal(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD))
