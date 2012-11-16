@@ -31,12 +31,12 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
 
   println( "Create data processor" )
   val PERIOD = 7 * 24 * 3600
-  val LINK_LIMIT = 10000
+  val LINK_LIMIT = 5000
   val datadir = "file:commits/"
   val projectsurl = new URL(datadir+"projects.txt")
   val usersurl = new URL(datadir+"users.txt")
   val forksurl = new URL(datadir+"forks.txt")
-  val commitsurl = new URL(datadir+"smallcommits.txt")
+  val commitsurl = new URL(datadir+"commits.txt")
   val processor:GHRelationsViz =
     if ( false ) {
        new GHRelationsVizDist(projectsurl,usersurl)
