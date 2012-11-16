@@ -260,13 +260,15 @@ $(document).ready(function(){
                         .radius(100)
                         .power(3);
 
+        var zoomer = d3.behavior.zoom();
+        
         var vis = d3.select("#graph")
                     .append("svg:svg")
                     .attr("width", graphWidth)
                     .attr("height", graphHeight)
                     .attr("pointer-events", "all")
                     .append('svg:g')
-                    .call(d3.behavior.zoom().on("zoom", onzoom ))
+                    .call(zoomer.on("zoom", onzoom ))
 
         var background = vis.append('svg:g')
                             .append('svg:rect')
@@ -277,8 +279,8 @@ $(document).ready(function(){
         var nodeVis = vis.append('svg:g');
 
         function onzoom() {
-            graphScale = d3.event.scale
-            graphTrans = d3.event.translate
+            graphScale = zoomer.scale();
+            graphTrans = zoomer.translate();
             nodeVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
             linkVis.attr("transform","translate("+graphTrans+")"+" scale("+graphScale+")");
         }
@@ -420,11 +422,26 @@ $(document).ready(function(){
             });
         }
         
-        function hidePopup(n) {
+        function hidePopup() {
             $("#pop-up").fadeOut(50);
             d3.select(this).attr("fill","url(#ten1)");
         }
     
+        $("#pop-up").dblclick( function(e) {
+            hidePopup();
+            e.preventDefault();
+        });
+        
+        $( "#resetZoom" ).click( function(e) {
+        	var xe = d3.extent(force.nodes(),function(n){ return n.x; });
+        	var ye = d3.extent(force.nodes(),function(n){ return n.y; });
+        	var s = Math.min( graphWidth / (xe[1]-xe[0]) , graphHeight / (ye[1]-ye[0]) );
+            zoomer.translate( [0,0] );
+            zoomer.scale( s );
+            onzoom();
+            e.preventDefault();
+        });
+        
     });
     
     ///////////////////////////////////////

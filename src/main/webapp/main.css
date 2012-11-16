@@ -62,6 +62,14 @@
     border-radius: 8px 8px;
 }
 
+#resetZoom {
+	font-size: 12px;
+	color: white;
+	text-decoration: underline;
+	cursor: pointer;
+	display: inline-block;
+}
+
 .langButton .ui-button-text {
     padding: 0px;
 }
