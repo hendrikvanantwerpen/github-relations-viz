@@ -394,12 +394,14 @@ $(document).ready(function(){
         }
     
         function showNodePopup(n) {
+        	var x = (n.x*graphScale)+graphTrans[0];
+        	var y = (n.y*graphScale)+graphTrans[1];
             showPopup("Project: "+n.name,
                       [n.desc || "",
                        "Language: "+(n.lang || UNKNOWN),
                        "Owner: "+(n.owner.name || n.owner.login || UNKNOWN),
                        n.value+" connected projects"],
-                      [n.x,n.y]);
+                       [x,y]);
         }
     
         function showPopup(title,contents,pos) {
@@ -411,8 +413,8 @@ $(document).ready(function(){
                     $("#pop-up-content").append("<div>"+contents[i]+"</div>");
                 }
                 // Popup position
-                var popLeft = (pos[0]*graphScale)+graphTrans[0]+20;
-                var popTop = (pos[1]*graphScale)+graphTrans[1]+20;
+                var popLeft = pos[0]+20;
+                var popTop  = pos[1]+20;
                 $("#pop-up").css({"left":popLeft,"top":popTop});
                 $("#pop-up").fadeIn(100);
             });
