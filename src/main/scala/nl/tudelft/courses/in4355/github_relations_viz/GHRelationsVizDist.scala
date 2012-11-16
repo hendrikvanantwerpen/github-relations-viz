@@ -61,23 +61,12 @@ class GHRelationsVizDist(projectsurl: URL,
 	       ActorCombinerConfig(
 	         AddressFromURIString("akka://ghlink@37.59.53.125:2552"), 
 	         ActorComputationConfig(List(
-        	   LinkComputerConfig(2, 0),
-			   LinkComputerConfig(2, 1)
+        	   LinkComputerConfig(4, 0),
+			   LinkComputerConfig(4, 1),
+			   LinkComputerConfig(4, 2),
+			   LinkComputerConfig(4, 3)
 	         ))
-	       )
-	      /**
-	       ,    
-		       ActorCombinerConfig(
-		         AddressFromURIString("akka://ghlink@188.165.237.154:2552"), 
-		         ActorComputationConfig(List(
-			       LinkComputerConfig(3, 2)
-			       //LinkComputerConfig(10, 9)
-			       //LinkComputerConfig(12, 10),
-			       //LinkComputerConfig(12, 11)
-		         ))      
-		       )  
-		       **/
-		      
+	       )  
 	      ))
 	   )
 	   ))
