@@ -22,10 +22,23 @@ import akka.util.duration._
 import akka.dispatch.{Future,Promise,ExecutionContext}
 import java.util.concurrent.Executors
 import com.typesafe.config.ConfigFactory
+import nl.tudelft.courses.in4355.github_relations_viz.actors.ActorCombinerSet
+import nl.tudelft.courses.in4355.github_relations_viz.actors.ActorCombinerConfig
+import akka.actor.AddressFromURIString
+import nl.tudelft.courses.in4355.github_relations_viz.actors.ActorComputationConfig
+import nl.tudelft.courses.in4355.github_relations_viz.actors.LinkComputerConfig
+import nl.tudelft.courses.in4355.github_relations_viz.actors.obtainLinksFilterPass
+import nl.tudelft.courses.in4355.github_relations_viz.actors.userProjectsPerWeekSkip
+
 
 class GHRelationsVizDist(projectsurl: URL,
                          usersurl: URL,
-                         system: ActorSystem) extends GHRelationsViz {
+                         commitsurl: URL,
+                         forksurl: URL,
+                         system: ActorSystem,
+                          minFrom: Int,
+                          maxUntil: Int,
+                          period: Int) extends GHRelationsViz {
   import GHRelationsViz._
 
   println( "Reading users" )
@@ -36,14 +49,33 @@ class GHRelationsVizDist(projectsurl: URL,
   val projects = readProjects(projectsurl)
   def getProject(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
   
-  implicit val timeout: Timeout = 2400 seconds
+  implicit val timeout: Timeout = 59 seconds
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   
   val linkCombineActor = system.actorOf(Props[LinkCombineActor], "LinkCombineActor")
+  
+  val config = ActorCombinerSet(List(
+	    ActorCombinerConfig(
+	     AddressFromURIString("akka://ghlink@37.59.53.125:2552"),        
+	     ActorCombinerSet(List(
+	       ActorCombinerConfig(
+	         AddressFromURIString("akka://ghlink@37.59.53.125:2552"), 
+	         ActorComputationConfig(List(
+        	   LinkComputerConfig(4, 0),
+			   LinkComputerConfig(4, 1),
+			   LinkComputerConfig(4, 2),
+			   LinkComputerConfig(4, 3)
+	         ))
+	       )  
+	      ))
+	   )
+	   ))
+  
+  linkCombineActor ! config
 
   def getProjectLinks(from: Int, until: Int, minWeight: Int) =
-    (linkCombineActor ? obtainLinks(from,until)).map( _.asInstanceOf[linkResult].map )
-
-  def getUserProjectsLinksPerWeek = Promise.successful ( Nil )
+    (linkCombineActor.ask(obtainLinksFilterPass(from,until,minWeight))).map( _.asInstanceOf[linkResult].map )
+  
+  def getUserProjectsLinksPerWeek = (linkCombineActor.ask(userProjectsPerWeekSkip())).map(_.asInstanceOf[Seq[(Int, Int)]])
   
 }
