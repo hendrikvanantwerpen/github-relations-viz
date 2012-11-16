@@ -7,17 +7,20 @@ import scala.util.matching.Regex
 import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
-import Logger._
+import util.Logger._
 import scala.collection.immutable.SortedMap
 import scala.collection.parallel.ParMap
 import scala.collection.GenMap
 import akka.dispatch.Future
+import akka.actor.ActorSystem
+import nl.tudelft.courses.in4355.github_relations_viz.util.Logger
 
 trait GHRelationsViz {
-  def getProjectLinks(from: Int, until: Int, minWeight: Int): Future[GenMap[Link,Int]]
+  def getProjectLinks(from: Int, until: Int, minWeight: Int, limit: Int = Int.MaxValue): Future[Either[String,GenMap[Link,Int]]]
   def getUser(id: UserRef): User
   def getProject(id: ProjectRef): Project
   def getUserProjectsLinksPerWeek: Future[Seq[(Int,Int)]]
+  def system: ActorSystem
 }
 
 object GHRelationsViz {
@@ -97,7 +100,11 @@ object GHRelationsViz {
   def projectsToLinks(ps: Set[ProjectRef]) = {
     createProduct(ps).map( l => (Link(l._1,l._2).normalize,1) )
   }
-    
+
+  def projectsToLinksWithoutCount(ps: Set[ProjectRef]) = {
+    createProduct(ps).map( l => Link(l._1,l._2).normalize )
+  }  
+  
   def createProduct[A](as: Set[A]): Set[(A,A)] =
     as.subsets(2)
       .map( s => (s.head,s.tail.head) )

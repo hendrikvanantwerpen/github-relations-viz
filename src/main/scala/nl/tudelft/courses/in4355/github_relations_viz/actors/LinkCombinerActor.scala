@@ -1,5 +1,6 @@
 package nl.tudelft.courses.in4355.github_relations_viz.actors
-import nl.tudelft.courses.in4355.github_relations_viz.Timer
+import nl.tudelft.courses.in4355.github_relations_viz.util.Timer
+import nl.tudelft.courses.in4355.github_relations_viz.util.Timer._
 import com.typesafe.config.ConfigFactory
 import akka.actor.{ ActorRef, Props, Actor, ActorSystem }
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities.Link
@@ -223,12 +224,12 @@ object combineLinks {
   
 	     actor ! config
 	       println("Config sent")
-	      Timer.tick
+	      val timer = new Timer
 	      actor !  obtainLinks(epoch2011,epoch2012)
 	      def receive = {
 	        case linkResult(res) =>
 	          println("GOT THE RESULT!!!. Size is: %d".format(res.size))
-	          println("Result took %d".format(Timer.tick))
+	          println("Result took %s".format(timer.tick.nanoTimeToString))
 	      }
      }))
   }

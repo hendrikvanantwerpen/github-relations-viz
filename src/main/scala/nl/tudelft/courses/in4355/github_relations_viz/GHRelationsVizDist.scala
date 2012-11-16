@@ -7,7 +7,7 @@ import scala.util.matching.Regex
 import GHEntities._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
-import Logger._
+import util.Logger._
 import scala.collection.immutable.SortedMap
 import scala.collection.parallel.ParMap
 import scala.collection.GenMap
@@ -22,10 +22,10 @@ import akka.util.duration._
 import akka.dispatch.{Future,Promise,ExecutionContext}
 import java.util.concurrent.Executors
 import com.typesafe.config.ConfigFactory
+import nl.tudelft.courses.in4355.github_relations_viz.util.Logger
 
 class GHRelationsVizDist(projectsurl: URL,
-                         usersurl: URL,
-                         system: ActorSystem) extends GHRelationsViz {
+                         usersurl: URL)(implicit ec: ExecutionContext, to: Timeout) extends GHRelationsViz {
   import GHRelationsViz._
 
   println( "Reading users" )
@@ -36,14 +36,12 @@ class GHRelationsVizDist(projectsurl: URL,
   val projects = readProjects(projectsurl)
   def getProject(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
   
-  implicit val timeout: Timeout = 2400 seconds
-  implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
-  
   val linkCombineActor = system.actorOf(Props[LinkCombineActor], "LinkCombineActor")
 
-  def getProjectLinks(from: Int, until: Int, minWeight: Int) =
-    (linkCombineActor ? obtainLinks(from,until)).map( _.asInstanceOf[linkResult].map )
+  def getProjectLinks(from: Int, until: Int, minWeight: Int, limit: Int) =
+    (linkCombineActor ? obtainLinks(from,until)).map( lr => Right(lr.asInstanceOf[linkResult].map) )
 
   def getUserProjectsLinksPerWeek = Promise.successful ( Nil )
   
+  def system = ActorSystem("ghlink", ConfigFactory.load.getConfig("LinkCombine"))
 }

@@ -8,24 +8,8 @@ import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import scala.collection.SortedSet
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities._
 import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz._
-
-trait Writer {
-  def write(msg: Any)
-  def writeln(msg: Any)
-}
-
-class FileWriter(filename: String) extends Writer {
-  private val res = scalax.io.Resource.fromFile(filename)
-  res.truncate(0)
-  private val writer = res.writer
-  override def write(msg: Any) = writer.write(msg.toString)
-  override def writeln(msg: Any) = writer.write(msg.toString+"\n")
-}
-
-class TeeWriter(writer: Writer) extends Writer {
-  override def write(msg: Any) = { print(msg.toString); writer.write(msg) }
-  override def writeln(msg: Any) = { println(msg.toString); writer.writeln(msg.toString) }
-}
+import nl.tudelft.courses.in4355.github_relations_viz.util.{FileWriter,TeeWriter}
+import nl.tudelft.courses.in4355.github_relations_viz.util.Timer._
 
 object GHRelationsStats extends App {
 
@@ -50,22 +34,6 @@ object GHRelationsStats extends App {
   val projectsPerUserHistFile = dataDir+"projects-per-user-histogram.dat"
   val linkWeightHistFile = dataDir+"link-weight-histogram.dat"
   
-  def timed[A](msg: String, l: String => Unit)(f: => A): A = {
-    l(msg+" ...")
-    val start = System.nanoTime()
-    val result: A = f
-    val end = System.nanoTime()
-    val dt = end-start
-    if ( dt > 1e9 ) {
-      l("done in %.2fs".format(dt/1e9))
-    } else if ( dt > 1e6 ) {
-      l("done in %.2fms".format(dt/1e6))
-    } else {
-      l("done in %.2fus".format(dt/1e3))
-    }
-    result
-  }
-
   val logger = new TeeWriter(new FileWriter(logfile))
 
   logger.write("Starting statistics calculation")

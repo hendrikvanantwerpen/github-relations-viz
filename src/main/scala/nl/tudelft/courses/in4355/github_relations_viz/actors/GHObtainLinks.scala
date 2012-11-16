@@ -6,7 +6,7 @@ import nl.tudelft.courses.in4355.github_relations_viz.GHEntities._
 import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz._
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
-import nl.tudelft.courses.in4355.github_relations_viz.Logger._
+import nl.tudelft.courses.in4355.github_relations_viz.util.Logger._
 import scala.collection.parallel.ParMap
 
 class GHObtainLinks(actorCount: Int, actorIndex: Int) {

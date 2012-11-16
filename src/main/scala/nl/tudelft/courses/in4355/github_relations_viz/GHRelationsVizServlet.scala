@@ -15,6 +15,10 @@ import scala.collection.{GenMap,GenSeq}
 import GHEntities._
 import com.typesafe.config.ConfigFactory
 import org.scalatra.Ok
+import akka.util.Timeout
+import akka.util.duration._
+import akka.dispatch.ExecutionContext
+import java.util.concurrent.Executors
 
 class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
 
@@ -22,6 +26,8 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
   val epoch2015 = 1420066800
 
   implicit val formats = net.liftweb.json.DefaultFormats
+  implicit val timeout: Timeout = 2400 seconds
+  implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())  
 
   println( "Create data processor" )
   val PERIOD = 7 * 24 * 3600
@@ -31,13 +37,11 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
   val usersurl = new URL(datadir+"users.txt")
   val forksurl = new URL(datadir+"forks.txt")
   val commitsurl = new URL(datadir+"smallcommits.txt")
-  val (system: ActorSystem, processor:GHRelationsViz) =
+  val processor:GHRelationsViz =
     if ( false ) {
-      val s = ActorSystem("ghlink", ConfigFactory.load.getConfig("LinkCombine"))
-      (s,new GHRelationsVizDist(projectsurl,usersurl,s))
+       new GHRelationsVizDist(projectsurl,usersurl)
     } else {
-      (ActorSystem(),
-       new GHRelationsVizLocal(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD))
+       new GHRelationsVizLocal(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD)
     }
   println( "Ready to go!" )
   
@@ -46,13 +50,10 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
     val to = params get "to" map( _.toInt ) getOrElse( Int.MaxValue )
     val minWeight = params get "minWeight" map( d => math.max(1,d.toInt) ) getOrElse( 1 )
     contentType = "application/json;charset=UTF-8"
-    processor.getProjectLinks(from, to, minWeight)
-             .map { links => 
-                  if ( links.size > LINK_LIMIT ) {
-                      Ok(write(("error" -> "Too many links found. Please limit selection."):JObject))
-                  } else {
-                      Ok(write(getGraphJSON(links)))
-                  }
+    processor.getProjectLinks(from, to, minWeight, LINK_LIMIT)
+             .map { 
+                _.fold( err => Ok(write(("error" -> (err+" Please limit selection.")):JObject)),
+                        links => Ok(write(getGraphJSON(links))) )
               }
   }
 
@@ -106,5 +107,6 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
     userProjectLinksPerWeek
       .map( dc => ("date" -> dc._1) ~ ("count" -> dc._2) )
   }
-    
+  
+  def system = processor.system
 }

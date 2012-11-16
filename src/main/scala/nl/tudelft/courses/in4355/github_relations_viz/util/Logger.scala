@@ -1,4 +1,4 @@
-package nl.tudelft.courses.in4355.github_relations_viz
+package nl.tudelft.courses.in4355.github_relations_viz.util
 
 object Logger {
 
