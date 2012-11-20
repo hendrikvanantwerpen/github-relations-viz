@@ -34,9 +34,14 @@
     padding: 10px;
 }
 
-.hist-graph {
+.hist-graph-current {
     fill: blue;
 }
+
+.hist-graph-all {
+    fill: gray;
+}
+
 
 .hist-brush .extent {
     fill-opacity: 0.125;
@@ -88,6 +93,11 @@ circle.node {
     stroke-width: 1.5px;
 }
 
+circle.node.fixed {
+    stroke: #000;
+    stroke-width: 3px;
+}
+
 line.link {
     stroke: #999;
     stroke-opacity: .6;
@@ -112,7 +122,7 @@ div#pop-up-content {
     font-size: 12px;
 }
 
-#waiting {
+.waiter {
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -120,4 +130,5 @@ div#pop-up-content {
 	bottom: 0px;
     background: rgba(5,5,5,0.5);
     z-index: 100;
+    display: none;
 }

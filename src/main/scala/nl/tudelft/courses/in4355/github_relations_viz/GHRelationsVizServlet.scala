@@ -2,6 +2,7 @@ package nl.tudelft.courses.in4355.github_relations_viz
 
 import akka.actor.ActorSystem
 import java.net.URL
+import net.liftweb.json.{parse}
 import net.liftweb.json.JsonAST._
 import net.liftweb.json.Extraction._
 import net.liftweb.json.Printer._
@@ -11,7 +12,7 @@ import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import org.scalatra.ScalatraServlet
 import org.scalatra.akka.AkkaSupport
-import scala.collection.{GenMap,GenSeq}
+import scala.collection.{GenMap,GenIterable}
 import GHEntities._
 import com.typesafe.config.ConfigFactory
 import org.scalatra.Ok
@@ -19,25 +20,25 @@ import akka.util.Timeout
 import akka.util.duration._
 import akka.dispatch.ExecutionContext
 import java.util.concurrent.Executors
+import util.Timer._
 
 class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
 
-  val epoch1990 = 631148400
-  val epoch2015 = 1420066800
+  private val epoch1990 = 631148400
+  private val epoch2015 = 1420066800
 
   implicit val formats = net.liftweb.json.DefaultFormats
   implicit val timeout: Timeout = 2400 seconds
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())  
 
   println( "Create data processor" )
-  val PERIOD = 7 * 24 * 3600
-  val LINK_LIMIT = 5000
-  val datadir = "file:commits/"
-  val projectsurl = new URL(datadir+"projects.txt")
-  val usersurl = new URL(datadir+"users.txt")
-  val forksurl = new URL(datadir+"forks.txt")
-  val commitsurl = new URL(datadir+"commits.txt")
-  val processor:GHRelationsViz =
+  private val PERIOD = 7 * 24 * 3600
+  private val datadir = "file:commits/"
+  private val projectsurl = new URL(datadir+"projects.txt")
+  private val usersurl = new URL(datadir+"users.txt")
+  private val forksurl = new URL(datadir+"forks.txt")
+  private val commitsurl = new URL(datadir+"smallercommits.txt")
+  private val processor:GHRelationsViz =
     if ( false ) {
        new GHRelationsVizDist(projectsurl,usersurl)
     } else {
@@ -45,26 +46,66 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
     }
   println( "Ready to go!" )
   
+  /* UI
+   * option for auto-add languages
+   * reset or jump to fixed nodes
+   * (semi-)automatic time run with current settings (time-window,languages,fixed projects)
+   */
+  
+  private def time_params = {
+    val from = params get "from" map (_.toInt) getOrElse( Int.MinValue )
+    val to = params get "to" map (_.toInt) getOrElse( Int.MaxValue )
+    (from,to)
+  }
+  
+  private def lang_params = {
+    val includeLangs = params get "include_langs" map ( parse(_).extract[List[String]] ) getOrElse Nil
+    val excludeLangs = params get "exclude_langs" map ( parse(_).extract[List[String]] ) getOrElse Nil
+    val langStrict = params get "langs_strict" map ( _.toLowerCase == "true" ) getOrElse false
+    val langFilter = Map.empty[String,Boolean] ++ includeLangs.map( _ -> true ) ++ excludeLangs.map( _ -> false )
+    (langFilter,langStrict)
+  }
+  
+  private def fork_params = {
+    val includeForks = params get "include_forks" map( _.toLowerCase == "true" ) getOrElse false
+    includeForks
+  } 
+  
   get("/links") {
-    val from = params get "from" map( _.toInt ) getOrElse( Int.MinValue )
-    val to = params get "to" map( _.toInt ) getOrElse( Int.MaxValue )
-    val minWeight = params get "minWeight" map( d => math.max(1,d.toInt) ) getOrElse( 1 )
+    val (from,to) = time_params
+    val (langFilter,langStrict) = lang_params
+    val includeForks = fork_params
+    val limit = params get "limit" map (_.toInt) getOrElse (Int.MaxValue)
+    val minLinkWeight = params get "min_link_weight" map ( d => math.max(1,d.toInt) ) getOrElse 1
     contentType = "application/json;charset=UTF-8"
-    processor.getProjectLinks(from, to, minWeight, LINK_LIMIT)
+    processor.getProjectLinks(from, to, langFilter, langStrict, includeForks, minLinkWeight, limit)
              .map { 
                 _.fold( err => Ok(write(("error" -> (err+" Please limit selection.")):JObject)),
-                        links => Ok(write(getGraphJSON(links))) )
+                        { links =>
+                          val json = timed("Writing graph json",println) { write(getGraphJSON(links)) }
+                          Ok(json)
+                        } )
               }
   }
 
   get("/hist") {
+    val (from,to) = time_params
+    val (langFilter,langStrict) = lang_params
+    val includeForks = fork_params
     contentType = "application/json;charset=UTF-8"
-    processor.getUserProjectsLinksPerWeek
+    processor.getUserProjectsLinksPerWeek(from,to,langFilter,langStrict,includeForks)
              .map( h => Ok(write(getHistJSON(h))) )
   }
   
-  def getGraphJSON(links: GenMap[Link,Int]) = {
-    println( "Convert project links to D3 data" )
+  get("/langs") {
+    val (from,to) = time_params
+    val includeForks = fork_params
+    contentType = "application/json;charset=UTF-8"
+    processor.getLanguages(from,to,includeForks)
+             .map( l => Ok(write(getLangsJSON(l))) )
+  }
+  
+  private def getGraphJSON(links: GenMap[Link,Int]) = {
     val projectMap =
       links
         .mapReduce[Map[ProjectRef,Int]] { t =>
@@ -75,17 +116,16 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
         .par.map( e => getProjectJSON(processor.getProject(e._1),e._2) )
     val d3links =
       links.map( e => getLinkJSON(e._1,e._2) )
-    println( "Return D3 graph" )
-     ("links" -> d3links.seq) ~ ("projects" -> d3nodes.seq)
+    ("links" -> d3links.seq) ~ ("projects" -> d3nodes.seq)
   }  
   
-  def getUserJSON(user: User) = {
+  private def getUserJSON(user: User) = {
     ( ("id" -> user.id) ~
       ("login" -> user.login) ~
       ("name" -> user.name) )
   }
   
-  def getProjectJSON(project: Project, value: Int) = {
+  private def getProjectJSON(project: Project, value: Int) = {
     ( ("id" -> project.id) ~
       ("name" -> project.name) ~
       ("desc" -> project.desc) ~
@@ -94,18 +134,23 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
       ("value" -> value) )
   }
   
-  def getLinkJSON(l: Link, value: Int) = {
+  private def getLinkJSON(l: Link, value: Int) = {
     ( ("project1" -> l.project1) ~
       ("project2" -> l.project2) ~
       ("value" -> value) )
   }
   
-  def linkToProjects(l: Link) =
+  private def getLangsJSON(langsCount: GenIterable[(String,Int)]) = {
+    (JObject(Nil) /: langsCount)( (j,lc) => j ~ ( lc._1 -> lc._2 ) )
+  }
+  
+  private def linkToProjects(l: Link) =
     Set(l.project1,l.project2)
     
-  def getHistJSON( userProjectLinksPerWeek: GenSeq[(Int,Int)] ) = {
+  private def getHistJSON( userProjectLinksPerWeek: GenIterable[(Int,Int)] ) = {
     userProjectLinksPerWeek
       .map( dc => ("date" -> dc._1) ~ ("count" -> dc._2) )
+      .toList
   }
   
   def system = processor.system

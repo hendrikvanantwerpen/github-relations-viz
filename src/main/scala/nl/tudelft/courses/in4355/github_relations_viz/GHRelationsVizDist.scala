@@ -25,23 +25,27 @@ import com.typesafe.config.ConfigFactory
 import nl.tudelft.courses.in4355.github_relations_viz.util.Logger
 
 class GHRelationsVizDist(projectsurl: URL,
-                         usersurl: URL)(implicit ec: ExecutionContext, to: Timeout) extends GHRelationsViz {
+                         usersurl: URL)(implicit ec: ExecutionContext, timeout: Timeout) extends GHRelationsViz {
   import GHRelationsViz._
 
   println( "Reading users" )
   val users = readUsers(usersurl)
-  def getUser(id: UserRef) = users.get(id).getOrElse(User.unknown(id))
+  override def getUser(id: UserRef) = users.get(id).getOrElse(User.unknown(id))
   
   println( "Reading projects" )
   val projects = readProjects(projectsurl)
-  def getProject(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
+  override def getProject(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
   
   val linkCombineActor = system.actorOf(Props[LinkCombineActor], "LinkCombineActor")
 
-  def getProjectLinks(from: Int, until: Int, minWeight: Int, limit: Int) =
-    (linkCombineActor ? obtainLinks(from,until)).map( lr => Right(lr.asInstanceOf[linkResult].map) )
+  def getProjectLinks(from: Int, to: Int, langFilter: Map[String,Boolean], langStrict: Boolean, includeForks: Boolean, minLinkWeight: Int, limit: Int) =
+    (linkCombineActor ? obtainLinks(from,to)).map( lr => Right(lr.asInstanceOf[linkResult].map) )
 
-  def getUserProjectsLinksPerWeek = Promise.successful ( Nil )
+  override def getUserProjectsLinksPerWeek(from: Int, to: Int, langFilter: Map[String,Boolean], langStrict: Boolean, includeForks: Boolean) = Promise.successful ( Nil )
+  
+  override def getLanguages(from: Int, to: Int, includeForks: Boolean) = Promise.successful ( Nil )
+  
+  override def getParentProject(id: ProjectRef): Option[ProjectRef] = None
   
   def system = ActorSystem("ghlink", ConfigFactory.load.getConfig("LinkCombine"))
 }

@@ -10,16 +10,18 @@ import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
 import util.Logger._
 import scala.collection.immutable.SortedMap
 import scala.collection.parallel.ParMap
-import scala.collection.GenMap
+import scala.collection.{GenMap,GenIterable}
 import akka.dispatch.Future
 import akka.actor.ActorSystem
 import nl.tudelft.courses.in4355.github_relations_viz.util.Logger
 
 trait GHRelationsViz {
-  def getProjectLinks(from: Int, until: Int, minWeight: Int, limit: Int = Int.MaxValue): Future[Either[String,GenMap[Link,Int]]]
+  def getProjectLinks(from: Int, to: Int, langFilter: Map[String,Boolean], langStrict: Boolean, includeForks: Boolean, minLinkWeight: Int, limit: Int): Future[Either[String,GenMap[Link,Int]]]
   def getUser(id: UserRef): User
   def getProject(id: ProjectRef): Project
-  def getUserProjectsLinksPerWeek: Future[Seq[(Int,Int)]]
+  def getParentProject(id: ProjectRef): Option[ProjectRef]
+  def getUserProjectsLinksPerWeek(from: Int, to: Int, langFilter: Map[String,Boolean], langStrict: Boolean, includeForks: Boolean): Future[GenIterable[(Int,Int)]]
+  def getLanguages(from: Int, to: Int, includeForks: Boolean): Future[GenIterable[(String,Int)]]
   def system: ActorSystem
 }
 
@@ -80,8 +82,8 @@ object GHRelationsViz {
 
   def readForks(url: URL) =
     getLines(url)
-      .mapReduce[Set[ProjectRef]] { l =>
-        parseStringToFork(l).map( _.project ).toList
+      .mapReduce[Map[ProjectRef,ProjectRef]] { l =>
+        parseStringToFork(l).map( f => (f.project -> f.parent) ).toList
       }    
   
   private val ForkReg = """([^\t]*)\t([^\t]*)""".r
