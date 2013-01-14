@@ -33,8 +33,8 @@ define(["jquery","rx","waiter","util","rx.binding"],function($,Rx,Waiter,util){
                 $.getJSON('/links?from='+d.timeRange[0]+
                           '&to='+d.timeRange[1]+
                           '&langs_strict='+d.langsFilter.strict+
-                          '&include_langs='+escape(JSON.stringify(d.langsFilter.include))+
-                          '&exclude_langs='+escape(JSON.stringify(d.langsFilter.exclude))+
+                          '&include_langs='+encodeURIComponent(JSON.stringify(d.langsFilter.include))+
+                          '&exclude_langs='+encodeURIComponent(JSON.stringify(d.langsFilter.exclude))+
                           '&min_link_weight='+d.minLinkValue+
                           '&limit=5000')
                  .success(function(json){

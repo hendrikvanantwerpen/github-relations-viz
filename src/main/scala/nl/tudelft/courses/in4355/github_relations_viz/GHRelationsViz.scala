@@ -11,19 +11,7 @@ import util.Logger._
 import scala.collection.immutable.SortedMap
 import scala.collection.parallel.ParMap
 import scala.collection.{GenMap,GenIterable}
-import akka.dispatch.Future
-import akka.actor.ActorSystem
 import nl.tudelft.courses.in4355.github_relations_viz.util.Logger
-
-trait GHRelationsViz {
-  def getProjectLinks(from: Int, to: Int, langFilter: Map[String,Boolean], langStrict: Boolean, includeForks: Boolean, minLinkWeight: Int, limit: Int): Future[Either[String,GenMap[Link,Int]]]
-  def getUser(id: UserRef): User
-  def getProject(id: ProjectRef): Project
-  def getParentProject(id: ProjectRef): Option[ProjectRef]
-  def getUserProjectsLinksPerWeek(from: Int, to: Int, langFilter: Map[String,Boolean], langStrict: Boolean, includeForks: Boolean): Future[GenIterable[(Int,Int)]]
-  def getLanguages(from: Int, to: Int, includeForks: Boolean): Future[GenIterable[(String,Int)]]
-  def system: ActorSystem
-}
 
 object GHRelationsViz {
 
@@ -42,18 +30,18 @@ object GHRelationsViz {
     }
   
   private val ProjectReg = """([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]*)""".r  
-  def parseStringToProject(str: String) = {
+  def parseStringToProject(l: String => LangRef)(str: String) = {
     try {
       val ProjectReg(id, ownerId, name, language, description) = str
-      Some( id.toInt -> Project(id.toInt, ownerId.toInt, notNULL(name), notNULL(language), notNULL(description)) )
+      Some( id.toInt -> Project(id.toInt, ownerId.toInt, notNULL(name), l(notNULL(language)), notNULL(description)) )
     } catch {
       case _ => { println( "Cannot parse to Project: "+str ); None }
     }
   }  
 
-  def readProjects(url: URL) =
+  def readProjects(ll: String => LangRef)(url: URL) =
     (Map.empty[ProjectRef,Project] /: getLines(url)) { (m,l) => 
-      parseStringToProject(l).map( m + _ ).getOrElse( m )
+      parseStringToProject(ll)(l).map( m + _ ).getOrElse( m )
     }
   
   private val UserReg = """([^\t]+)\t([^\t]*)\t([^\t]+)""".r

@@ -37,7 +37,7 @@ libraryDependencies ++= Seq(
 
 mainClass := Some("nl.tudelft.courses.in4355.github_relations_viz.actors.lrApp")
 
-fork in run := true
+//fork in run := true
 
 //connectInput in run := true
 

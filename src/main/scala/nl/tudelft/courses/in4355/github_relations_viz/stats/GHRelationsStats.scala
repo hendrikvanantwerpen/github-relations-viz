@@ -3,9 +3,10 @@ package nl.tudelft.courses.in4355.github_relations_viz.stats
 import java.net.URL
 import java.util.Date
 import scala.collection.immutable.SortedMap
+import net.van_antwerpen.scala.collection.mapreduce.Aggregator
 import net.van_antwerpen.scala.collection.mapreduce.Aggregator._
 import net.van_antwerpen.scala.collection.mapreduce.MapReduce._
-import scala.collection.SortedSet
+import scala.collection.{BitSet,SortedSet}
 import nl.tudelft.courses.in4355.github_relations_viz.GHEntities._
 import nl.tudelft.courses.in4355.github_relations_viz.GHRelationsViz._
 import nl.tudelft.courses.in4355.github_relations_viz.util.{FileWriter,TeeWriter}
@@ -13,7 +14,14 @@ import nl.tudelft.courses.in4355.github_relations_viz.util.Timer._
 
 object GHRelationsStats extends App {
 
+  implicit val agg = new Aggregator[BitSet,Int] {
+    override def zero = BitSet.empty
+    override def insert(bs: BitSet, i: Int) = bs + i
+  }
+
   val epoch1990 = 631148400
+  val epoch2010 = 1262300400
+  val epoch2011 = 1293836400
   val epoch2015 = 1420066800
   
   val PERIOD    = 7 * 24 * 3600
@@ -48,7 +56,7 @@ object GHRelationsStats extends App {
 
   logger.writeln("Build project map")
   val projects = timed("reading",logger.writeln) {
-    readProjects(projectsurl)
+    readProjects( _ => 0 )(projectsurl)
   }
   def projectResolv(id: ProjectRef) = projects.get(id).getOrElse(Project.unknown(id))
   logger.writeln("Found %d projects".format(projects.size) )
@@ -87,7 +95,7 @@ object GHRelationsStats extends App {
   logger.writeln("Kept %d user-project links after time filter".format(fcs.size) )
   
   val ups = timed("group projects by user",logger.writeln) {
-    fcs.par.reduceTo[Map[UserRef,Set[ProjectRef]]]
+    fcs.par.reduceTo[Map[UserRef,BitSet]]
   }
   
   val projectsPerUserHist = ups.par.mapReduce[SortedMap[Int,Int]]( e => e._2.size -> 1 )
@@ -101,11 +109,22 @@ object GHRelationsStats extends App {
   } )
   logger.writeln("Going to process %d project links".format(totalLinks) )
   
-  val links = timed("Calculating project links",logger.writeln) {
-    ups.values.par.mapReduce[Map[Link,Int]]( projectsToLinks )
+  val secondLinks = timed("Calculating project links (fancy reduce)",logger.writeln) {
+    ((Set.empty[Link],BitSet.empty) /: ups.values.par) { (ls,ps) =>
+      val links = ls._1
+      val seen = ls._2
+      val newprojects = ps -- seen
+      val newlinks = for (p1 <- newprojects; p2 <- ps) yield Link(p1,p2)
+      (links ++ newlinks, seen ++ newprojects)
+    }
   }
   logger.writeln("Found %d project links".format(links.size) )
   
+  val links = timed("Calculating project links (plain mapReduce)",logger.writeln) {
+    ups.values.par.map( _.toSet ).mapReduce[Map[Link,Int]]( projectsToLinks )
+  }
+  logger.writeln("Found %d project links".format(links.size) )
+
   val linkHist = links.par.mapReduce[SortedMap[Int,Int]]( l => l._2 -> 1 )
   val ldh = new FileWriter(linkWeightHistFile)
   linkHist.foreach( l => ldh.writeln( "%d %d".format(l._1,l._2) ))

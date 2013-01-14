@@ -128,8 +128,8 @@ define(["jquery","rx","waiter","util","rx.binding"],function($,Rx,Waiter,util){
     langsFilter.subscribe(function(langsFilter){
         waiter.busy();
         $.getJSON('/hist?langs_strict='+langsFilter.strict+
-        		  '&include_langs='+escape(JSON.stringify(langsFilter.include))+
-        		  '&exclude_langs='+escape(JSON.stringify(langsFilter.exclude)))
+        		  '&include_langs='+encodeURIComponent(JSON.stringify(langsFilter.include))+
+        		  '&exclude_langs='+encodeURIComponent(JSON.stringify(langsFilter.exclude)))
          .success(function(data){
               updateCurr(convertData(data));
               waiter.done();

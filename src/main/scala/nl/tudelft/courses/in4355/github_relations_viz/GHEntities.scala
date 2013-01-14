@@ -4,6 +4,7 @@ object GHEntities {
 
   type UserRef = Int
   type ProjectRef = Int
+  type LangRef = Int
   
   case class User(id:Int,login:String,name:String) {
     override def equals(a: Any) = a.isInstanceOf[User] && a.asInstanceOf[User].id == id
@@ -12,13 +13,14 @@ object GHEntities {
   object User {
     def unknown(id: Int) = User(id,"Unknown user %d".format(id),"")
   }
-  case class Project(id:Int,owner:UserRef,name:String,lang:String,desc:String) {
+  case class Project(id:Int,owner:UserRef,name:String,lang:LangRef,desc:String) {
     override def equals(a: Any) = a.isInstanceOf[Project] && a.asInstanceOf[Project].id == id
     override def hashCode = id
   }
   object Project {
-    def unknown(id: Int) = Project(id,-1,"Unknown project %d".format(id),"","")    
+    def unknown(id: Int) = Project(id,-1,"Unknown project %d".format(id),-1,"")    
   }
+  case class Interaction(user:UserRef,project:ProjectRef)
   case class Commit(project:ProjectRef,user:UserRef,timestamp:Int)
   case class Fork(project:ProjectRef,parent:ProjectRef)
   case class Link(project1:ProjectRef,project2:ProjectRef) {

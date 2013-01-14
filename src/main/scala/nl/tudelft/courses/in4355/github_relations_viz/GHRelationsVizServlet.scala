@@ -14,22 +14,15 @@ import org.scalatra.ScalatraServlet
 import org.scalatra.akka.AkkaSupport
 import scala.collection.{GenMap,GenIterable}
 import GHEntities._
-import com.typesafe.config.ConfigFactory
 import org.scalatra.Ok
-import akka.util.Timeout
-import akka.util.duration._
-import akka.dispatch.ExecutionContext
-import java.util.concurrent.Executors
 import util.Timer._
 
-class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
+class GHRelationsVizServlet extends ScalatraServlet {
 
   private val epoch1990 = 631148400
   private val epoch2015 = 1420066800
 
   implicit val formats = net.liftweb.json.DefaultFormats
-  implicit val timeout: Timeout = 2400 seconds
-  implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())  
 
   println( "Create data processor" )
   private val PERIOD = 7 * 24 * 3600
@@ -37,13 +30,9 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
   private val projectsurl = new URL(datadir+"projects.txt")
   private val usersurl = new URL(datadir+"users.txt")
   private val forksurl = new URL(datadir+"forks.txt")
-  private val commitsurl = new URL(datadir+"smallercommits.txt")
-  private val processor:GHRelationsViz =
-    if ( false ) {
-       new GHRelationsVizDist(projectsurl,usersurl)
-    } else {
-       new GHRelationsVizLocal(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD)
-    }
+  private val commitsurl = new URL(datadir+"smallcommits.txt")
+  private val processor =
+    new GHRelationsVizLocal(projectsurl,usersurl,forksurl,commitsurl,epoch1990,epoch2015,PERIOD)
   println( "Ready to go!" )
   
   /* UI
@@ -63,46 +52,36 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
     val excludeLangs = params get "exclude_langs" map ( parse(_).extract[List[String]] ) getOrElse Nil
     val langStrict = params get "langs_strict" map ( _.toLowerCase == "true" ) getOrElse false
     val langFilter = Map.empty[String,Boolean] ++ includeLangs.map( _ -> true ) ++ excludeLangs.map( _ -> false )
-    (langFilter,langStrict)
+    new LangFilter(langFilter map { kv => processor.getLangRef(kv._1) -> kv._2 }, langStrict)
   }
-  
-  private def fork_params = {
-    val includeForks = params get "include_forks" map( _.toLowerCase == "true" ) getOrElse false
-    includeForks
-  } 
   
   get("/links") {
     val (from,to) = time_params
-    val (langFilter,langStrict) = lang_params
-    val includeForks = fork_params
+    val langFilter = lang_params
     val limit = params get "limit" map (_.toInt) getOrElse (Int.MaxValue)
     val minLinkWeight = params get "min_link_weight" map ( d => math.max(1,d.toInt) ) getOrElse 1
     contentType = "application/json;charset=UTF-8"
-    processor.getProjectLinks(from, to, langFilter, langStrict, includeForks, minLinkWeight, limit)
-             .map { 
-                _.fold( err => Ok(write(("error" -> (err+" Please limit selection.")):JObject)),
-                        { links =>
-                          val json = timed("Writing graph json",println) { write(getGraphJSON(links)) }
-                          Ok(json)
-                        } )
-              }
+    processor.getProjectLinks(from, to, langFilter, minLinkWeight, limit)
+             .fold( err => Ok(write(("error" -> (err+" Please limit selection.")):JObject)),
+                    { links =>
+                        val json = timed("Writing graph json",println) { write(getGraphJSON(links)) }
+                        Ok(json)
+                    } )
   }
 
   get("/hist") {
     val (from,to) = time_params
-    val (langFilter,langStrict) = lang_params
-    val includeForks = fork_params
+    val langFilter = lang_params
     contentType = "application/json;charset=UTF-8"
-    processor.getUserProjectsLinksPerWeek(from,to,langFilter,langStrict,includeForks)
-             .map( h => Ok(write(getHistJSON(h))) )
+    val j = processor.getInteractionHistogram(from,to,langFilter)
+    Ok(write(getHistJSON(j)))
   }
   
   get("/langs") {
     val (from,to) = time_params
-    val includeForks = fork_params
     contentType = "application/json;charset=UTF-8"
-    processor.getLanguages(from,to,includeForks)
-             .map( l => Ok(write(getLangsJSON(l))) )
+    val j = processor.getLanguageHistogram(from,to)
+    Ok(write(getLangsJSON(j)))
   }
   
   private def getGraphJSON(links: GenMap[Link,Int]) = {
@@ -153,5 +132,4 @@ class GHRelationsVizServlet extends ScalatraServlet with AkkaSupport {
       .toList
   }
   
-  def system = processor.system
 }
