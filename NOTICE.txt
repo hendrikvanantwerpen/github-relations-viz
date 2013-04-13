@@ -1,0 +1,11 @@
+This project incorporates jQuery, which is licensed under the MIT
+license. See jquery.org/license.
+
+This project incorporates RxJS, which is copyright of Microsoft Open
+Technologies, Inc. and distributed under the Apache 2.0 License.
+
+This project incorporates RequireJS, which is copyright of The Dojo
+Foundation, distributed under the MIT or new BSD license.
+
+This project incorporates D3.js, which is copyright of Mike Bostock and
+distributed under the BSD license.
